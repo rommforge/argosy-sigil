@@ -65,6 +65,36 @@ int sigil_iso_find_file(const sigil_io *io,
                         const char *target_name,
                         sigil_iso_file_loc *out);
 
+/* ---- AES-XTS (Nintendo Switch variant) ---------------------------------- */
+
+#if SIGIL_WITH_SWITCH
+/* Decrypt `len` bytes of `data` in place using AES-XTS with Nintendo's
+ * variant: 0x200-byte sectors, big-endian sector number written to bytes
+ * 8-15 of the tweak input (bytes 0-7 zero), standard GF(2^128) `x` multiply
+ * with 0x87 reduction.
+ *
+ * `key` is 32 bytes: bytes 0..15 are the data key (key1), bytes 16..31 are
+ * the tweak key (key2). */
+void sigil_aes_xts_decrypt_nintendo(const uint8_t key[32],
+                                     uint64_t start_sector,
+                                     uint8_t *data, size_t len);
+
+/* Decode `header_key = <64 hex chars>` from a prod.keys text blob. */
+int sigil_decode_header_key_from_text(const char *text, size_t text_len,
+                                       uint8_t out[32]);
+
+/* Resolve the 32-byte header_key from a sigil_support struct. Tries raw key
+ * first, then text blob, then path. Returns SIGIL_OK + writes 32 bytes; or
+ * SIGIL_ERR_NEEDS_KEY when none of the inputs are present. */
+int sigil_resolve_header_key(const sigil_support *sup, uint8_t out[32]);
+
+/* NCA header parser: takes a decrypted 0xC00 NCA header buffer, validates
+ * NCA3 magic, extracts the 16-hex title id (program_id @ 0x210, falling
+ * back to rights_id @ 0x230). Writes uppercase canonical title id (16 chars
+ * + NUL) to `out_title_id`. Returns SIGIL_OK on hit. */
+int sigil_nca_extract_title_id(const uint8_t *decrypted_header, char out_title_id[17]);
+#endif
+
 /* ---- SYSTEM.CNF / boot-line parser (PSX + PS2) -------------------------- */
 
 /* Parse a boot line from SYSTEM.CNF text. Looks for `boot_key` (e.g. "BOOT2"
