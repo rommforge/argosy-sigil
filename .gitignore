@@ -13,7 +13,7 @@ compile_commands.json
 
 # CLI binary
 cli/sigil
-sigil
+/sigil
 
 # Test outputs
 tests/build/
