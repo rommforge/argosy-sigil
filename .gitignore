@@ -28,3 +28,6 @@ tests/*.log
 
 # Local sample data
 /local-roms/
+.cxx/
+bindings/android/build/
+bindings/android/.cxx/
