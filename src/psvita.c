@@ -4,11 +4,13 @@
 
 #include "sigil_internal.h"
 
-/* PS Vita is filename-only today: no PKG/VPK binary parser. The real
- * extraction happens in src/filename.c (M2). This shim returns NOT_FOUND so
- * the dispatcher can fall through cleanly. */
+/* PS Vita is filename-only today: no PKG/VPK binary parser exists in
+ * argosy's Kotlin code, so sigil mirrors the same scope. The actual ID
+ * extraction lives in src/filename.c; this shim just delegates and marks
+ * the source accordingly. */
 int sigil_extract_psvita(const sigil_io *io, const char *filename_hint,
                          const sigil_options *opts, sigil_result *out) {
-    (void)io; (void)filename_hint; (void)opts; (void)out;
-    return SIGIL_ERR_NOT_FOUND;
+    (void)io;
+    (void)opts;
+    return sigil_filename_fallback(filename_hint, SIGIL_PLATFORM_PSVITA, out);
 }
