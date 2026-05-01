@@ -213,17 +213,16 @@ consumers:
 
 ## Bindings
 
-Reference bindings live under `bindings/`:
+- [`bindings/android/`](bindings/android/) — Gradle library module
+  wrapping the C ABI for Kotlin/Java consumers via JNI. Used by
+  argosy-launcher.
+- [`bindings/go/`](bindings/go/) — cgo wrapper for Go consumers
+  (Grout). `go test` against `/tmp/roms/roms/` passes for all 9
+  platforms including encrypted Switch XCIs.
 
-- `bindings/android/` — Gradle library module wrapping the C ABI for
-  Kotlin/Java consumers via JNI. Used by argosy-launcher; usable by
-  any Android app. See [bindings/android/README.md](bindings/android/README.md).
-
-The C library itself is the supported distribution; bindings are
-examples consumers may copy or extend. Additional bindings (Go via
-cgo for Grout, Rust via bindgen, etc.) can be added under
-`bindings/<lang>/` — sigil's small public API and stable enum
-numbering keep these straightforward.
+Additional bindings (Rust via bindgen, Python via cffi, etc.) can be
+added under `bindings/<lang>/` — sigil's small public API and stable
+enum numbering keep these straightforward.
 
 ## Testing
 
