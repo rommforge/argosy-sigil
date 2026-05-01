@@ -1,7 +1,4 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-
+// SPDX-License-Identifier: MPL-2.0
 #ifndef SIGIL_TEST_HELPERS_H
 #define SIGIL_TEST_HELPERS_H
 
@@ -21,13 +18,11 @@ static const char *get_rom_dir(void) {
     return d;
 }
 
-/* Build "<rom_dir>/<sub>" into `out`. */
 static int build_subdir(const char *rom_dir, const char *sub, char out[512]) {
     int n = snprintf(out, 512, "%s/%s", rom_dir, sub);
     return (n > 0 && n < 512) ? 0 : -1;
 }
 
-/* Lower-case extension extractor. */
 static void ext_of(const char *name, char out[16]) {
     out[0] = '\0';
     const char *dot = strrchr(name, '.');
@@ -41,8 +36,6 @@ static void ext_of(const char *name, char out[16]) {
     out[i] = '\0';
 }
 
-/* Iterate files in `dir`, call `fn(path, name)` for each. Returns count
- * processed. */
 typedef struct {
     int processed;
     int passed;

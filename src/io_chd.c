@@ -1,7 +1,4 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-
+// SPDX-License-Identifier: MPL-2.0
 #include "sigil_internal.h"
 
 #if SIGIL_WITH_CHD
@@ -13,8 +10,6 @@
 #define CHD_SECTOR_SIZE 2048
 #define MAX_HUNK_BYTES (16 * 1024 * 1024)
 
-/* CD raw sectors begin with this 12-byte sync pattern. We use it to detect
- * MODE1 vs MODE2 user-data offsets in mixed-mode CD CHDs. */
 static const uint8_t CD_SYNC_PATTERN[12] = {
     0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00
 };
@@ -45,8 +40,6 @@ static int chd_read_sector(chd_ctx *ctx, uint32_t lba, uint8_t out[CHD_SECTOR_SI
     return SIGIL_OK;
 }
 
-/* sigil_io: read a flat byte stream of cooked 2048-byte sectors. The CHD
- * frames are addressed by LBA; we derive lba+intra_sector from the offset. */
 static int chd_io_read(void *ctx_, uint64_t off, void *buf, size_t len) {
     chd_ctx *ctx = (chd_ctx *)ctx_;
     uint8_t *out = (uint8_t *)buf;
@@ -110,12 +103,8 @@ sigil_io *sigil_io_open_chd(const char *path) {
     ctx->total_frames = (uint32_t)(header->logicalbytes / ctx->unit_bytes);
     ctx->last_hunk = -1;
 
-    /* MODE detection: CD CHDs use 2448 unit_bytes regardless of track type;
-     * the user-data offset depends on the mode byte at offset 15 of each
-     * 2352-byte raw sector:
-     *   MODE1: [12 sync][3 hdr][1 mode=1][2048 data][288 EDC/ECC]      -> off 16
-     *   MODE2: [12 sync][3 hdr][1 mode=2][8 subhdr][2048 data][...]    -> off 24
-     * Pure 2048-byte ISO-style hunks (unit_bytes == 2048) need no offset. */
+    /* CD CHDs use 2448-byte units; user data offset depends on the mode byte
+     * at frame[15]: MODE1 = 16, MODE2 = 24. */
     ctx->data_offset = 0;
     if (ctx->unit_bytes > CHD_SECTOR_SIZE) {
         uint32_t probe_lba = 16;
@@ -131,9 +120,8 @@ sigil_io *sigil_io_open_chd(const char *path) {
                     else if (mode == 2) ctx->data_offset = 24;
                 }
             }
-            ctx->last_hunk = -1;  /* invalidate so next read repopulates */
+            ctx->last_hunk = -1;
         }
-        /* Bounds check: ensure cooked 2048 fits within unit_bytes. */
         if (ctx->data_offset + CHD_SECTOR_SIZE > ctx->unit_bytes) {
             ctx->data_offset = 0;
         }
@@ -148,7 +136,7 @@ sigil_io *sigil_io_open_chd(const char *path) {
     return io;
 }
 
-#else  /* !SIGIL_WITH_CHD */
+#else
 
 sigil_io *sigil_io_open_chd(const char *path) {
     (void)path;

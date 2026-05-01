@@ -1,40 +1,29 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-
+// SPDX-License-Identifier: MPL-2.0
 #include "sigil_internal.h"
-#include <ctype.h>
-#include <string.h>
 
-/* PSP UMD_DATA.BIN encodes the disc id followed by '|' and other fields,
+/* PSP UMD_DATA.BIN encodes the disc id followed by `|` and other fields,
  * e.g. "ULUS-10064|0123456789ABCDEF|...". The dashed form is what the disc
- * carries; the dashless form (`ULUS10064`) is what PSP's SAVEDATA folder
- * convention uses. */
+ * carries; PSP's SAVEDATA folder convention drops the dash. */
 
 static int parse_disc_id(const uint8_t *buf, size_t len,
                          char raw[32], char canonical[32]) {
-    /* Bound the scan: the candidate is everything before the first '|'. */
     const uint8_t *pipe = (const uint8_t *)memchr(buf, '|', len);
     if (!pipe) return SIGIL_ERR_NOT_FOUND;
     size_t cand_len = (size_t)(pipe - buf);
 
-    /* Trim trailing whitespace. */
-    while (cand_len > 0 && isspace((unsigned char)buf[cand_len - 1])) cand_len--;
-    /* Skip leading whitespace. */
+    while (cand_len > 0 && (buf[cand_len - 1] == ' ' || buf[cand_len - 1] == '\t')) cand_len--;
     size_t start = 0;
-    while (start < cand_len && isspace((unsigned char)buf[start])) start++;
+    while (start < cand_len && (buf[start] == ' ' || buf[start] == '\t')) start++;
     cand_len -= start;
     if (cand_len > 31) return SIGIL_ERR_NOT_FOUND;
 
-    /* Validate `^([A-Z]{4})-?(\d{5})$` (the regex used in Iso9660Utils.kt). */
     char tmp[32];
     memcpy(tmp, buf + start, cand_len);
     tmp[cand_len] = '\0';
 
-    /* Check shape: 9 or 10 chars. */
     if (cand_len != 9 && cand_len != 10) return SIGIL_ERR_NOT_FOUND;
     for (int i = 0; i < 4; i++) {
-        if (tmp[i] < 'A' || tmp[i] > 'Z') return SIGIL_ERR_NOT_FOUND;
+        if (!sigil_is_upper(tmp[i])) return SIGIL_ERR_NOT_FOUND;
     }
     size_t digits_off = 4;
     if (cand_len == 10) {
@@ -42,16 +31,10 @@ static int parse_disc_id(const uint8_t *buf, size_t len,
         digits_off = 5;
     }
     for (int i = 0; i < 5; i++) {
-        char c = tmp[digits_off + i];
-        if (c < '0' || c > '9') return SIGIL_ERR_NOT_FOUND;
+        if (!sigil_is_dig(tmp[digits_off + i])) return SIGIL_ERR_NOT_FOUND;
     }
 
-    /* raw = preserve original (always with dash, since UMD_DATA.BIN spec uses
-     * the dashed form; if the disc happened to omit it we still emit the
-     * dashed form for raw to match argosy's `TitleIdResult` documentation
-     * convention of "as it appears in the binary"). */
     if (cand_len == 9) {
-        /* Insert dash for raw. */
         memcpy(raw, tmp, 4);
         raw[4] = '-';
         memcpy(raw + 5, tmp + 4, 5);
@@ -61,7 +44,6 @@ static int parse_disc_id(const uint8_t *buf, size_t len,
         raw[10] = '\0';
     }
 
-    /* canonical = always dashless 9-char. */
     memcpy(canonical, tmp, 4);
     memcpy(canonical + 4, tmp + digits_off, 5);
     canonical[9] = '\0';

@@ -1,16 +1,7 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-
+// SPDX-License-Identifier: MPL-2.0
 #include "sigil.h"
 #include <jni.h>
 #include <string.h>
-
-/* JNI bridge for the Kotlin/Java Sigil API.
- *
- * Maps a path + optional platform-slug + optional prod.keys path to a
- * Java SigilResult object. Returns null on extraction failure (which the
- * Kotlin facade treats the same as "no title id"). */
 
 static jclass g_result_class = NULL;
 static jmethodID g_result_ctor = NULL;
@@ -20,10 +11,20 @@ static void load_result_class(JNIEnv *env) {
     jclass cls = (*env)->FindClass(env, "com/nendo/sigil/SigilResult");
     if (!cls) return;
     g_result_class = (jclass)(*env)->NewGlobalRef(env, cls);
-    /* SigilResult(titleId: String, rawSerial: String, platformSlug: String,
-     *             source: Int, usage: Int) */
+    /* SigilResult(titleId, rawSerial, platformSlug, source, usage) */
     g_result_ctor = (*env)->GetMethodID(env, g_result_class, "<init>",
-                                         "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;II)V");
+        "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;II)V");
+}
+
+JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
+    (void)reserved;
+    JNIEnv *env = NULL;
+    if ((*vm)->GetEnv(vm, (void **)&env, JNI_VERSION_1_6) != JNI_OK || !env) return;
+    if (g_result_class) {
+        (*env)->DeleteGlobalRef(env, g_result_class);
+        g_result_class = NULL;
+        g_result_ctor = NULL;
+    }
 }
 
 JNIEXPORT jstring JNICALL

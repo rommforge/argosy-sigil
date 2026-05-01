@@ -1,40 +1,24 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-
+// SPDX-License-Identifier: MPL-2.0
 #include "sigil_internal.h"
 
 #if SIGIL_WITH_WIIU
 
-#include <ctype.h>
 #include <stdlib.h>
-#include <string.h>
 
-/* Port of argosy's ZArchiveReader.kt — only the metadata path needed for
- * Wii U title-ID extraction. The file tree and name table are stored
- * uncompressed in the archive (only file *contents* go through zstd), so
- * this milestone avoids the zstd dependency entirely. */
+/* WUA / zArchive metadata layout (big-endian throughout). The footer at
+ * end of file points to uncompressed names + file_tree sections; only
+ * file *contents* go through zstd, which we don't read.
+ *
+ *   0x20 names_offset      0x28 names_size
+ *   0x30 file_tree_offset  0x38 file_tree_size
+ *   0x88 version (u32)     0x8C magic (u32)
+ */
 
 #define WUA_MAGIC         0x169F52D6u
 #define WUA_VERSION_1     0x61BF3A01u
 #define WUA_FOOTER_SIZE   144
 #define WUA_FILE_ENTRY    16
-
-/* Footer fields we care about (big-endian); all u64 unless noted. Order:
- *   0x00 compressed_offset
- *   0x08 compressed_size
- *   0x10 offset_records_offset
- *   0x18 offset_records_size
- *   0x20 names_offset
- *   0x28 names_size
- *   0x30 file_tree_offset
- *   0x38 file_tree_size
- *   0x40..0x60 metaDir + metaData (unused)
- *   0x60..0x80 SHA-256 (32 bytes)
- *   0x80 total_size (u64)
- *   0x88 version (u32)
- *   0x8C magic (u32)
- */
+#define WUA_MAX_METADATA  (16 * 1024 * 1024)
 
 typedef struct {
     uint64_t names_offset, names_size;
@@ -61,7 +45,6 @@ static int read_footer(const sigil_io *io, wua_footer *out) {
     return SIGIL_OK;
 }
 
-/* Read a name from the name table given a 1-byte length prefix. */
 static size_t read_name(const uint8_t *names, size_t names_len,
                         uint32_t offset, char *out, size_t out_size) {
     if (offset >= names_len) return 0;
@@ -73,28 +56,17 @@ static size_t read_name(const uint8_t *names, size_t names_len,
     return len;
 }
 
-static bool is_hex_char(char c) {
-    return (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
-}
-
-/* Match `00050000<8 hex>` at the start of `name`. */
+/* Match `00050000<8 hex>` at start of `name`; emit canonical (last 8) +
+ * raw (full 16) uppercase. */
 static bool match_wiiu_title_dir(const char *name, char canonical[9], char raw[17]) {
     if (strlen(name) < 16) return false;
     if (memcmp(name, "00050000", 8) != 0) return false;
     for (int i = 0; i < 8; i++) {
-        if (!is_hex_char(name[8 + i])) return false;
+        if (!sigil_is_hex(name[8 + i])) return false;
     }
-    /* canonical = last 8 chars, uppercase */
-    for (int i = 0; i < 8; i++) {
-        char c = name[8 + i];
-        canonical[i] = (c >= 'a' && c <= 'f') ? (char)(c - 32) : c;
-    }
+    for (int i = 0; i < 8; i++) canonical[i] = sigil_to_upper(name[8 + i]);
     canonical[8] = '\0';
-    /* raw = full 16, uppercase */
-    for (int i = 0; i < 16; i++) {
-        char c = name[i];
-        raw[i] = (c >= 'a' && c <= 'f') ? (char)(c - 32) : c;
-    }
+    for (int i = 0; i < 16; i++) raw[i] = sigil_to_upper(name[i]);
     raw[16] = '\0';
     return true;
 }
@@ -113,8 +85,7 @@ int sigil_extract_wiiu(const sigil_io *io, const char *filename_hint,
     int rc = read_footer(io, &ft);
     if (rc != SIGIL_OK) return rc;
 
-    /* Cap the metadata reads to keep memory bounded. */
-    if (ft.names_size > 16 * 1024 * 1024 || ft.file_tree_size > 16 * 1024 * 1024) {
+    if (ft.names_size > WUA_MAX_METADATA || ft.file_tree_size > WUA_MAX_METADATA) {
         return SIGIL_ERR_NOT_FOUND;
     }
 
@@ -128,16 +99,13 @@ int sigil_extract_wiiu(const sigil_io *io, const char *filename_hint,
     rc = sigil_io_read_exact(io, ft.file_tree_offset, tree, (size_t)ft.file_tree_size);
     if (rc != SIGIL_OK) { free(names); free(tree); return rc; }
 
-    /* Root entry is at index 0; expected to be a directory. The WUA file-
-     * tree entry layout is 16 bytes:
-     *   directory:  [name_off | flag] [child_start_idx] [child_count] [reserved]
-     *   file:       [name_off | flag] [offset_lo] [size_lo] [size_hi|offset_hi]
-     * `flag` bit (top of name_off u32) is 0 for directory, 1 for file. */
     if (ft.file_tree_size < WUA_FILE_ENTRY) {
         free(names); free(tree);
         return SIGIL_ERR_NOT_FOUND;
     }
 
+    /* Tree entries are 16 bytes; high bit of first u32 is the file/dir flag
+     * (0 = directory). Root (index 0) must be a directory. */
     uint32_t root_name_off_and_flag = sigil_read_be32(tree);
     bool root_is_dir = (root_name_off_and_flag & 0x80000000u) == 0;
     if (!root_is_dir) {
@@ -161,8 +129,7 @@ int sigil_extract_wiiu(const sigil_io *io, const char *filename_hint,
 
         uint32_t name_off = nf & 0x7FFFFFFFu;
         char name[256];
-        size_t got = read_name(names, (size_t)ft.names_size, name_off, name, sizeof(name));
-        if (got == 0) continue;
+        if (read_name(names, (size_t)ft.names_size, name_off, name, sizeof(name)) == 0) continue;
 
         char canonical[9], raw[17];
         if (match_wiiu_title_dir(name, canonical, raw)) {
@@ -179,4 +146,4 @@ int sigil_extract_wiiu(const sigil_io *io, const char *filename_hint,
     return rc;
 }
 
-#endif /* SIGIL_WITH_WIIU */
+#endif

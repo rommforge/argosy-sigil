@@ -1,33 +1,16 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-
+// SPDX-License-Identifier: MPL-2.0
 #include "sigil_internal.h"
 
 #if SIGIL_WITH_SWITCH
 
 #include <stdlib.h>
-#include <string.h>
 
 #define HFS0_ROOT_OFFSET 0xF000
+#define HFS0_ENTRY_SIZE  64
 
-/* PFS0 helper exported by switch_nsp.c. */
-int sigil_pfs0_extract_title_id(const sigil_io *io, uint64_t partition_off,
-                                 const uint8_t *header_key_or_null,
-                                 char out_title_id[17]);
+#define MAX_SWITCH_FILE_COUNT  4096
+#define MAX_SWITCH_STRING_TABLE (1024 * 1024)
 
-/* HFS0 file entries are 64 bytes (vs PFS0's 24). Layout per entry:
- *   0x00  uint64  file offset (relative to data start)
- *   0x08  uint64  file size
- *   0x10  uint32  name offset (in string table)
- *   0x14  uint32  hashed bytes
- *   0x18  uint64  reserved
- *   0x20  uint8[32]  SHA-256 hash
- */
-
-/* Walk an HFS0 partition starting at `part_off`. Looks for an entry named
- * `target_name` (e.g. "secure"), and on hit fills *out_off + *out_size with
- * its position in the file. */
 static int hfs0_find_partition(const sigil_io *io, uint64_t part_off,
                                 const char *target_name,
                                 uint64_t *out_off, uint64_t *out_size) {
@@ -38,11 +21,11 @@ static int hfs0_find_partition(const sigil_io *io, uint64_t part_off,
 
     uint32_t file_count        = sigil_read_le32(hdr + 4);
     uint32_t string_table_size = sigil_read_le32(hdr + 8);
-    if (file_count > 4096 || string_table_size > 1024 * 1024) {
+    if (file_count > MAX_SWITCH_FILE_COUNT || string_table_size > MAX_SWITCH_STRING_TABLE) {
         return SIGIL_ERR_NOT_FOUND;
     }
 
-    size_t entries_size = (size_t)file_count * 64;
+    size_t entries_size = (size_t)file_count * HFS0_ENTRY_SIZE;
     uint8_t *entries = (uint8_t *)malloc(entries_size);
     if (!entries) return SIGIL_ERR_OOM;
     rc = sigil_io_read_exact(io, part_off + 16, entries, entries_size);
@@ -59,7 +42,7 @@ static int hfs0_find_partition(const sigil_io *io, uint64_t part_off,
 
     rc = SIGIL_ERR_NOT_FOUND;
     for (uint32_t i = 0; i < file_count; i++) {
-        const uint8_t *e = entries + i * 64;
+        const uint8_t *e = entries + i * HFS0_ENTRY_SIZE;
         uint64_t fo = sigil_read_le64(e);
         uint64_t fs = sigil_read_le64(e + 8);
         uint32_t name_off = sigil_read_le32(e + 16);
@@ -82,17 +65,10 @@ static int hfs0_find_partition(const sigil_io *io, uint64_t part_off,
     return rc;
 }
 
-/* HFS0 partition's `secure` sub-partition is itself a PFS0-shaped (HFS0)
- * partition containing the .nca files we need. The NCA structure is the
- * same as in NSP, so we walk it with the PFS0 helper. */
 static int hfs0_extract_title_from_partition(const sigil_io *io,
                                               uint64_t part_off,
                                               const uint8_t *header_key_or_null,
                                               char out_title_id[17]) {
-    /* Read the inner partition's header — it's HFS0 too, but the NCA file
-     * layout is what matters. We treat it like PFS0 with HFS0's 64-byte
-     * entries; rather than duplicating the parser, walk it with HFS0
-     * entry layout here. */
     uint8_t hdr[16];
     int rc = sigil_io_read_exact(io, part_off, hdr, 16);
     if (rc != SIGIL_OK) return rc;
@@ -100,11 +76,11 @@ static int hfs0_extract_title_from_partition(const sigil_io *io,
 
     uint32_t file_count        = sigil_read_le32(hdr + 4);
     uint32_t string_table_size = sigil_read_le32(hdr + 8);
-    if (file_count > 4096 || string_table_size > 1024 * 1024) {
+    if (file_count > MAX_SWITCH_FILE_COUNT || string_table_size > MAX_SWITCH_STRING_TABLE) {
         return SIGIL_ERR_NOT_FOUND;
     }
 
-    size_t entries_size = (size_t)file_count * 64;
+    size_t entries_size = (size_t)file_count * HFS0_ENTRY_SIZE;
     uint8_t *entries = (uint8_t *)malloc(entries_size);
     if (!entries) return SIGIL_ERR_OOM;
     rc = sigil_io_read_exact(io, part_off + 16, entries, entries_size);
@@ -118,14 +94,14 @@ static int hfs0_extract_title_from_partition(const sigil_io *io,
 
     uint64_t data_start = part_off + 16 + entries_size + string_table_size;
 
-    rc = SIGIL_ERR_NOT_FOUND;
     if (!header_key_or_null) {
         free(entries); free(string_table);
         return SIGIL_ERR_NEEDS_KEY;
     }
 
+    rc = SIGIL_ERR_NOT_FOUND;
     for (uint32_t i = 0; i < file_count; i++) {
-        const uint8_t *e = entries + i * 64;
+        const uint8_t *e = entries + i * HFS0_ENTRY_SIZE;
         uint64_t fo = sigil_read_le64(e);
         uint64_t fs = sigil_read_le64(e + 8);
         uint32_t name_off = sigil_read_le32(e + 16);
@@ -137,15 +113,14 @@ static int hfs0_extract_title_from_partition(const sigil_io *io,
         if (name_len < 4) continue;
         const uint8_t *name = string_table + name_off;
         if (name[name_len - 4] != '.') continue;
-        char a = (char)name[name_len - 3];
-        char b = (char)name[name_len - 2];
-        char c = (char)name[name_len - 1];
-        if ((a != 'n' && a != 'N') || (b != 'c' && b != 'C') || (c != 'a' && c != 'A')) continue;
-        if (fs < 0xC00) continue;
+        if (((name[name_len - 3] | 0x20) != 'n')
+            || ((name[name_len - 2] | 0x20) != 'c')
+            || ((name[name_len - 1] | 0x20) != 'a')) continue;
+        if (fs < SIGIL_NCA_HEADER_SIZE) continue;
 
-        uint8_t header[0xC00];
-        if (sigil_io_read_exact(io, data_start + fo, header, 0xC00) != SIGIL_OK) continue;
-        sigil_aes_xts_decrypt_nintendo(header_key_or_null, 0, header, 0xC00);
+        uint8_t header[SIGIL_NCA_HEADER_SIZE];
+        if (sigil_io_read_exact(io, data_start + fo, header, SIGIL_NCA_HEADER_SIZE) != SIGIL_OK) continue;
+        sigil_aes_xts_decrypt_nintendo(header_key_or_null, 0, header, SIGIL_NCA_HEADER_SIZE);
         if (sigil_nca_extract_title_id(header, out_title_id) == SIGIL_OK) {
             rc = SIGIL_OK;
             break;
@@ -159,8 +134,6 @@ static int hfs0_extract_title_from_partition(const sigil_io *io,
 
 int sigil_extract_xci(const sigil_io *io, const sigil_options *opts,
                       sigil_result *out) {
-    /* XCI carries a CGA gamecard header at offset 0; the root HFS0 sits at
-     * 0xF000. Validate the root, find "secure", recurse. */
     uint64_t secure_off, secure_size;
     int rc = hfs0_find_partition(io, HFS0_ROOT_OFFSET, "secure",
                                   &secure_off, &secure_size);
@@ -182,4 +155,4 @@ int sigil_extract_xci(const sigil_io *io, const sigil_options *opts,
     return SIGIL_OK;
 }
 
-#endif /* SIGIL_WITH_SWITCH */
+#endif

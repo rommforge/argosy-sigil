@@ -1,16 +1,8 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-
+// SPDX-License-Identifier: MPL-2.0
 #include "sigil_internal.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-/* Reads a raw CD `.bin` (typically 2352-byte sectors), detects MODE1/MODE2
- * from the CD sync pattern at sector 16, and exposes a sigil_io that yields
- * cooked 2048-byte ISO9660 sectors. Falls back to a flat 2048-byte stream
- * when no sync pattern is found (already cooked). */
 
 static const uint8_t CD_SYNC_PATTERN[12] = {
     0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00
@@ -21,8 +13,8 @@ static const uint8_t CD_SYNC_PATTERN[12] = {
 typedef struct {
     FILE    *fp;
     uint64_t total_size;
-    uint32_t unit_bytes;     /* 2048 if cooked, 2352 if raw */
-    uint32_t data_offset;    /* 0 if cooked, 16/24 if raw MODE1/MODE2 */
+    uint32_t unit_bytes;
+    uint32_t data_offset;
 } raw_ctx;
 
 static int raw_io_read(void *ctx_, uint64_t off, void *buf, size_t len) {
@@ -64,7 +56,6 @@ static int raw_io_read(void *ctx_, uint64_t off, void *buf, size_t len) {
 static int64_t raw_io_size(void *ctx_) {
     raw_ctx *ctx = (raw_ctx *)ctx_;
     if (ctx->unit_bytes == COOKED_SECTOR) return (int64_t)ctx->total_size;
-    /* Logical cooked size = total_sectors * 2048. */
     uint64_t sectors = ctx->total_size / ctx->unit_bytes;
     return (int64_t)(sectors * COOKED_SECTOR);
 }
@@ -90,8 +81,6 @@ sigil_io *sigil_io_open_raw_cd(const char *path) {
     ctx->fp = fp;
     ctx->total_size = (uint64_t)sz;
 
-    /* Probe sector 16 as a 2352-byte raw frame; if it carries the sync
-     * pattern, treat the file as raw and select MODE1/MODE2 offset. */
     uint8_t probe[2352];
     if (fseeko(fp, 16 * 2352, SEEK_SET) == 0
         && fread(probe, 1, sizeof(probe), fp) == sizeof(probe)

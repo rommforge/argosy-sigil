@@ -1,15 +1,13 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-
+// SPDX-License-Identifier: MPL-2.0
 #ifndef SIGIL_INTERNAL_H
 #define SIGIL_INTERNAL_H
 
 #include "sigil.h"
+#include "sigil_util.h"
 #include <stdbool.h>
 #include <string.h>
 
-/* ---- Byte-order helpers ------------------------------------------------- */
+#define SIGIL_NCA_HEADER_SIZE 0xC00
 
 static inline uint32_t sigil_read_le32(const uint8_t *p) {
     return (uint32_t)p[0]
@@ -35,13 +33,7 @@ static inline uint64_t sigil_read_be64(const uint8_t *p) {
          |  (uint64_t)sigil_read_be32(p + 4);
 }
 
-/* ---- I/O convenience ---------------------------------------------------- */
-
-/* Reads exactly `len` bytes; returns SIGIL_OK on full read, error code
- * otherwise. Never returns short. */
 int sigil_io_read_exact(const sigil_io *io, uint64_t off, void *buf, size_t len);
-
-/* ---- ISO9660 walker (sector callback) ----------------------------------- */
 
 #define SIGIL_ISO_SECTOR_SIZE 2048
 
@@ -50,68 +42,29 @@ typedef struct {
     uint32_t length;
 } sigil_iso_file_loc;
 
-/* Read sector `lba` (2048 bytes) into `out`. Returns SIGIL_OK on success. */
 int sigil_iso_read_sector(const sigil_io *io, uint32_t lba, uint8_t out[SIGIL_ISO_SECTOR_SIZE]);
-
-/* Read PVD at sector 16, validate "CD001", extract root directory LBA/length.
- * Returns SIGIL_OK on success, SIGIL_ERR_NOT_FOUND if PVD invalid. */
 int sigil_iso_read_pvd_root(const sigil_io *io, uint32_t *root_lba, uint32_t *root_len);
-
-/* Find a file in the directory at (dir_lba, dir_len). Case-insensitive name
- * match, accepts both "NAME" and "NAME;1" variants. Returns SIGIL_OK and
- * fills `out` on hit; SIGIL_ERR_NOT_FOUND otherwise. */
 int sigil_iso_find_file(const sigil_io *io,
                         uint32_t dir_lba, uint32_t dir_len,
                         const char *target_name,
                         sigil_iso_file_loc *out);
 
-/* ---- AES-XTS (Nintendo Switch variant) ---------------------------------- */
-
 #if SIGIL_WITH_SWITCH
-/* Decrypt `len` bytes of `data` in place using AES-XTS with Nintendo's
- * variant: 0x200-byte sectors, big-endian sector number written to bytes
- * 8-15 of the tweak input (bytes 0-7 zero), standard GF(2^128) `x` multiply
- * with 0x87 reduction.
- *
- * `key` is 32 bytes: bytes 0..15 are the data key (key1), bytes 16..31 are
- * the tweak key (key2). */
 void sigil_aes_xts_decrypt_nintendo(const uint8_t key[32],
                                      uint64_t start_sector,
                                      uint8_t *data, size_t len);
 
-/* Decode `header_key = <64 hex chars>` from a prod.keys text blob. */
 int sigil_decode_header_key_from_text(const char *text, size_t text_len,
                                        uint8_t out[32]);
 
-/* Resolve the 32-byte header_key from a sigil_support struct. Tries raw key
- * first, then text blob, then path. Returns SIGIL_OK + writes 32 bytes; or
- * SIGIL_ERR_NEEDS_KEY when none of the inputs are present. */
 int sigil_resolve_header_key(const sigil_support *sup, uint8_t out[32]);
 
-/* NCA header parser: takes a decrypted 0xC00 NCA header buffer, validates
- * NCA3 magic, extracts the 16-hex title id (program_id @ 0x210, falling
- * back to rights_id @ 0x230). Writes uppercase canonical title id (16 chars
- * + NUL) to `out_title_id`. Returns SIGIL_OK on hit. */
 int sigil_nca_extract_title_id(const uint8_t *decrypted_header, char out_title_id[17]);
 #endif
 
-/* ---- SYSTEM.CNF / boot-line parser (PSX + PS2) -------------------------- */
-
-/* Parse a boot line from SYSTEM.CNF text. Looks for `boot_key` (e.g. "BOOT2"
- * or "BOOT") followed by `=`, optional whitespace, optional cdrom prefix
- * (`cdrom0:` or `cdrom:` with optional `\`), then the LLLL[_.]NNN.NN serial
- * terminated by `;`.
- *
- * Writes:
- *   raw[0..10]       e.g. "SLUS_201.05" — preserves the original separators
- *   canonical[0..10] e.g. "SLUS-20105"  — dashed RomM form
- *
- * Both buffers must hold at least 11 bytes. Returns SIGIL_OK on match. */
 int sigil_cnf_parse_boot(const uint8_t *cnf, size_t len,
                          const char *boot_key,
                          char raw[32], char canonical[32]);
-
-/* ---- Per-platform extractors -------------------------------------------- */
 
 int sigil_extract_psp(const sigil_io *io, const char *filename_hint,
                       const sigil_options *opts, sigil_result *out);
@@ -132,8 +85,6 @@ int sigil_extract_wiiu(const sigil_io *io, const char *filename_hint,
 int sigil_extract_psvita(const sigil_io *io, const char *filename_hint,
                          const sigil_options *opts, sigil_result *out);
 
-/* ---- Filename fallback -------------------------------------------------- */
-
 #if SIGIL_WITH_FILENAME
 int sigil_filename_fallback(const char *filename_hint,
                             sigil_platform platform,
@@ -147,11 +98,9 @@ static inline int sigil_filename_fallback(const char *filename_hint,
 }
 #endif
 
-/* ---- Result init -------------------------------------------------------- */
-
 static inline void sigil_result_init(sigil_result *r) {
     memset(r, 0, sizeof(*r));
     r->struct_version = SIGIL_RESULT_V1;
 }
 
-#endif /* SIGIL_INTERNAL_H */
+#endif

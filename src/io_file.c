@@ -1,7 +1,4 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-
+// SPDX-License-Identifier: MPL-2.0
 #include "sigil_internal.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -64,8 +61,7 @@ int sigil_io_read_exact(const sigil_io *io, uint64_t off, void *buf, size_t len)
     size_t remaining = len;
     while (remaining > 0) {
         int got = io->read(io->ctx, off, p, remaining);
-        if (got < 0) return SIGIL_ERR_IO;
-        if (got == 0) return SIGIL_ERR_IO;  /* short read */
+        if (got <= 0) return SIGIL_ERR_IO;
         p += got;
         off += (uint64_t)got;
         remaining -= (size_t)got;

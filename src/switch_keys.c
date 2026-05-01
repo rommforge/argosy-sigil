@@ -1,12 +1,7 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-
+// SPDX-License-Identifier: MPL-2.0
 #include "sigil_internal.h"
-#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 
 static int hex_nibble(char c) {
     if (c >= '0' && c <= '9') return c - '0';
@@ -15,7 +10,6 @@ static int hex_nibble(char c) {
     return -1;
 }
 
-/* Decode a 64-char hex string into 32 bytes. */
 static int decode_hex32(const char *hex, size_t len, uint8_t out[32]) {
     if (len != 64) return SIGIL_ERR_INVALID_ARG;
     for (int i = 0; i < 32; i++) {
@@ -27,8 +21,8 @@ static int decode_hex32(const char *hex, size_t len, uint8_t out[32]) {
     return SIGIL_OK;
 }
 
-/* Find a `key_name = <hex>` line in prod.keys text. Returns hex span on
- * success; both pointers null on miss. */
+static bool is_ws(char c) { return c == ' ' || c == '\t'; }
+
 static int find_key_hex(const char *text, size_t text_len, const char *key_name,
                         const char **hex_start, size_t *hex_len) {
     size_t kn_len = strlen(key_name);
@@ -36,26 +30,21 @@ static int find_key_hex(const char *text, size_t text_len, const char *key_name,
     const char *end = text + text_len;
 
     while (cur < end) {
-        /* Find start of next line. */
         const char *line_end = memchr(cur, '\n', (size_t)(end - cur));
         if (!line_end) line_end = end;
 
-        /* Skip leading whitespace. */
         const char *p = cur;
-        while (p < line_end && isspace((unsigned char)*p)) p++;
+        while (p < line_end && (is_ws(*p) || *p == '\r')) p++;
 
         if (p + kn_len <= line_end && memcmp(p, key_name, kn_len) == 0) {
             const char *q = p + kn_len;
-            /* Must be followed by space, tab, or `=`. */
-            if (q < line_end && (*q == ' ' || *q == '\t' || *q == '=')) {
-                /* Skip to '=' and past it. */
+            if (q < line_end && (is_ws(*q) || *q == '=')) {
                 while (q < line_end && *q != '=') q++;
                 if (q < line_end && *q == '=') {
                     q++;
-                    while (q < line_end && isspace((unsigned char)*q)) q++;
-                    /* Trim trailing whitespace. */
+                    while (q < line_end && is_ws(*q)) q++;
                     const char *e = line_end;
-                    while (e > q && isspace((unsigned char)*(e - 1))) e--;
+                    while (e > q && (is_ws(*(e - 1)) || *(e - 1) == '\r')) e--;
                     *hex_start = q;
                     *hex_len = (size_t)(e - q);
                     return SIGIL_OK;
@@ -93,8 +82,6 @@ int sigil_load_header_key_from_prod_keys(const char *path, uint8_t out[32]) {
     return rc;
 }
 
-/* Internal: extract header_key from an in-memory blob. Used when the
- * caller passes prod.keys content via sigil_support.switch_prod_keys_text. */
 int sigil_decode_header_key_from_text(const char *text, size_t text_len,
                                        uint8_t out[32]) {
     if (!text || !out) return SIGIL_ERR_INVALID_ARG;

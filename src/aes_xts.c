@@ -1,33 +1,18 @@
-/* This Source Code Form is subject to the terms of the Mozilla Public
- * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
-
+// SPDX-License-Identifier: MPL-2.0
 #include "sigil_internal.h"
 
 #if SIGIL_WITH_SWITCH
 
-#include "aes.h"   /* tiny-AES-c */
-#include <string.h>
+#include "aes.h"
 
-/* Nintendo-variant AES-XTS notes (from argosy's AesXts.kt:74-83 and the
- * commit message of e6997dd8 "Fix AES-XTS to use big-endian sector
- * numbers"):
+/* Nintendo XTS variant: tweak input has bytes 0-7 zero, bytes 8-15 holding
+ * the sector number in big-endian. Standard P1619 puts the sector LE in
+ * bytes 0-7 with bytes 8-15 zero. Test vectors against generic XTS pass
+ * at sector 0 (zero is zero either way) but fail at any sector >= 1.
  *
- *   The tweak INPUT is built as a 16-byte buffer with bytes 0-7 zero and
- *   bytes 8-15 holding the sector number in big-endian order (sector_num
- *   & 0xFF in byte 15, the next byte in 14, ...).
- *
- *   Standard IEEE P1619 puts the sector number little-endian in bytes 0-7
- *   with bytes 8-15 zero. Test vectors generated against generic XTS will
- *   pass at sector 0 (zero is zero in either encoding) but fail at any
- *   sector >= 1. This is a documented prior bug — argosy shipped the
- *   standard variant first, then fixed it. Ports MUST follow the Nintendo
- *   form.
- *
- *   The GF(2^128) multiplication (`mul_alpha`) below IS standard: shift
- *   left by 1 with byte 0 the LSB and byte 15 the MSB, XOR 0x87 into byte
- *   0 if the high bit was set. Only the tweak input is non-standard.
- */
+ * The GF(2^128) `mul_alpha` below IS standard: shift left by 1 with byte
+ * 0 the LSB and byte 15 the MSB, XOR 0x87 into byte 0 if the high bit was
+ * set. Only the tweak input is non-standard. */
 
 static inline void mul_alpha(uint8_t t[16]) {
     uint8_t carry = (t[15] >> 7) & 1;
@@ -43,14 +28,13 @@ void sigil_aes_xts_decrypt_nintendo(const uint8_t key[32],
                                      uint8_t *data, size_t len) {
     struct AES_ctx data_ctx;
     struct AES_ctx tweak_ctx;
-    AES_init_ctx(&data_ctx,  key);        /* key1 = first 16 bytes */
-    AES_init_ctx(&tweak_ctx, key + 16);   /* key2 = next 16 bytes */
+    AES_init_ctx(&data_ctx,  key);
+    AES_init_ctx(&tweak_ctx, key + 16);
 
     const size_t SECTOR = 0x200;
     size_t full_sectors = len / SECTOR;
 
     for (size_t s = 0; s < full_sectors; s++) {
-        /* Build Nintendo-variant tweak input. */
         uint8_t tweak[16] = {0};
         uint64_t n = start_sector + s;
         for (int i = 15; i >= 8; i--) {
@@ -69,9 +53,9 @@ void sigil_aes_xts_decrypt_nintendo(const uint8_t key[32],
         }
     }
 
-    /* Handle a trailing partial sector (the NCA header path always uses
-     * exact 0xC00 = 6 full sectors so this branch is rarely exercised, but
-     * preserve the original Kotlin behavior for robustness). */
+    /* Trailing partial sector path. NCA headers are exact 0xC00 = 6 full
+     * sectors so this is rarely exercised, but the original Kotlin handles
+     * it for robustness. */
     size_t remaining_off = full_sectors * SECTOR;
     if (remaining_off < len) {
         uint8_t tweak[16] = {0};
@@ -94,4 +78,4 @@ void sigil_aes_xts_decrypt_nintendo(const uint8_t key[32],
     }
 }
 
-#endif /* SIGIL_WITH_SWITCH */
+#endif
