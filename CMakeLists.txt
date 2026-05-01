@@ -141,7 +141,9 @@ if(SIGIL_WITH_SWITCH)
 endif()
 if(SIGIL_WITH_WIIU)
     target_compile_definitions(sigil PRIVATE SIGIL_WITH_WIIU=1)
-    target_link_libraries(sigil PRIVATE sigil_zstd)
+    # WUA title-ID extraction reads only the uncompressed file tree + name
+    # table; the zstd-compressed blocks hold file *contents* and aren't
+    # needed for our purpose.
 endif()
 if(SIGIL_WITH_3DS)
     target_compile_definitions(sigil PRIVATE SIGIL_WITH_3DS=1)
