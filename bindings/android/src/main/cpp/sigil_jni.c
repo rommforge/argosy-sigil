@@ -1,0 +1,82 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at https://mozilla.org/MPL/2.0/. */
+
+#include "sigil.h"
+#include <jni.h>
+#include <string.h>
+
+/* JNI bridge for the Kotlin/Java Sigil API.
+ *
+ * Maps a path + optional platform-slug + optional prod.keys path to a
+ * Java SigilResult object. Returns null on extraction failure (which the
+ * Kotlin facade treats the same as "no title id"). */
+
+static jclass g_result_class = NULL;
+static jmethodID g_result_ctor = NULL;
+
+static void load_result_class(JNIEnv *env) {
+    if (g_result_class) return;
+    jclass cls = (*env)->FindClass(env, "com/nendo/sigil/SigilResult");
+    if (!cls) return;
+    g_result_class = (jclass)(*env)->NewGlobalRef(env, cls);
+    /* SigilResult(titleId: String, rawSerial: String, platformSlug: String,
+     *             source: Int, usage: Int) */
+    g_result_ctor = (*env)->GetMethodID(env, g_result_class, "<init>",
+                                         "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;II)V");
+}
+
+JNIEXPORT jstring JNICALL
+Java_com_nendo_sigil_Sigil_nativeVersion(JNIEnv *env, jclass clazz) {
+    (void)clazz;
+    return (*env)->NewStringUTF(env, sigil_version());
+}
+
+JNIEXPORT jobject JNICALL
+Java_com_nendo_sigil_Sigil_nativeExtract(JNIEnv *env, jclass clazz,
+                                          jstring jpath,
+                                          jstring jplatform_slug,
+                                          jstring jprod_keys_path) {
+    (void)clazz;
+    if (!jpath) return NULL;
+
+    const char *path = (*env)->GetStringUTFChars(env, jpath, NULL);
+    if (!path) return NULL;
+
+    const char *slug = NULL;
+    if (jplatform_slug) slug = (*env)->GetStringUTFChars(env, jplatform_slug, NULL);
+
+    const char *prod_keys = NULL;
+    if (jprod_keys_path) prod_keys = (*env)->GetStringUTFChars(env, jprod_keys_path, NULL);
+
+    sigil_platform hint = sigil_platform_from_slug(slug);
+
+    sigil_support sup = {
+        .struct_version = SIGIL_SUPPORT_V1,
+        .switch_prod_keys_path = prod_keys,
+    };
+    sigil_options opts = {
+        .struct_version = SIGIL_OPTIONS_V1,
+        .support = prod_keys ? &sup : NULL,
+        .flags = SIGIL_FLAG_FILENAME_FALLBACK,
+    };
+
+    sigil_result r;
+    int rc = sigil_extract_from_path(path, hint, &opts, &r);
+
+    (*env)->ReleaseStringUTFChars(env, jpath, path);
+    if (slug)      (*env)->ReleaseStringUTFChars(env, jplatform_slug, slug);
+    if (prod_keys) (*env)->ReleaseStringUTFChars(env, jprod_keys_path, prod_keys);
+
+    if (rc != SIGIL_OK) return NULL;
+
+    load_result_class(env);
+    if (!g_result_class || !g_result_ctor) return NULL;
+
+    jstring jtitle = (*env)->NewStringUTF(env, r.title_id);
+    jstring jraw   = (*env)->NewStringUTF(env, r.raw_serial);
+    jstring jslug  = (*env)->NewStringUTF(env, sigil_platform_to_slug(r.platform));
+
+    return (*env)->NewObject(env, g_result_class, g_result_ctor,
+                             jtitle, jraw, jslug, (jint)r.source, (jint)r.usage);
+}
