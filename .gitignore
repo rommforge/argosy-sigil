@@ -1,0 +1,30 @@
+build/
+build-*/
+cmake-build-*/
+.cache/
+compile_commands.json
+
+*.o
+*.a
+*.so
+*.dylib
+*.dll
+*.exe
+
+# CLI binary
+cli/sigil
+sigil
+
+# Test outputs
+tests/build/
+tests/*.bin
+tests/*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Local sample data
+/local-roms/
