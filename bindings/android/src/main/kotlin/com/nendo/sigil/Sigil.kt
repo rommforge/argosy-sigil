@@ -8,7 +8,8 @@ data class SigilResult(
     val saveId: String,
     val platformSlug: String,
     private val sourceCode: Int,
-    private val usageCode: Int
+    private val usageCode: Int,
+    val experimental: Boolean = false
 ) {
     val source: Source get() = Source.fromCode(sourceCode)
     val usage: Usage get() = Usage.fromCode(usageCode)

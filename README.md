@@ -30,6 +30,10 @@ identifier directly from the disc/cart binary and hands back:
 - `source` — `binary` if the ID came from the file content
   (high-confidence, lockable) or `filename` if it had to fall back to
   scanning the filename for a community-naming bracket pattern.
+- `experimental` — `1` for extractors that haven't been validated
+  against real-world samples (PS3, Xbox 360, PSP-via-CSO at time of
+  writing). Consumers should surface this to users so a low-confidence
+  result can be flagged in UI / logs.
 
 Persist `save_id` alongside `title_id` on your game record once you
 extract it — `title_id` doesn't change, and re-reading the disc to
@@ -65,17 +69,19 @@ to sigil's own files must remain MPL-2.0.
 
 ## Supported platforms
 
-| Slug | Platform | Inputs | `title_id` example | `usage` |
-|---|---|---|---|---|
-| `psp` | PSP | `.iso`, `.chd` | `ULUS10064` | folder-prefix |
-| `psx` | PlayStation | `.iso`, `.bin`, `.chd` | `SLUS-12345` | file-prefix |
-| `ps2` | PlayStation 2 | `.iso`, `.chd` | `SLUS-20675` | folder-exact |
-| `psvita` | PS Vita | `.zip` (filename only) | `PCSE12345` | folder-exact |
-| `switch` | Nintendo Switch | `.nsp`, `.xci` | `0100ABCD12345000` | folder-exact |
-| `3ds` | Nintendo 3DS | `.3ds`, `.cci`, `.z3ds`, `.zcci` | `0004000000123456` | folder-exact |
-| `wii` | Wii | `.iso`, `.rvz` | `525A5445` (hex of ASCII gameId) | folder-exact |
-| `wiiu` | Wii U | `.wua` | `10143500` (last 8 of folder name) | folder-exact |
-| `gamecube` | GameCube | `.iso`, `.rvz` | `475A4C45` (hex of ASCII gameId) | file-prefix |
+| Slug | Platform | Inputs | `title_id` example | `usage` | Status |
+|---|---|---|---|---|---|
+| `psp` | PSP | `.iso`, `.chd`, `.cso` / `.ciso` | `ULUS10064` | folder-prefix | `.cso` experimental |
+| `psx` | PlayStation | `.iso`, `.bin`, `.chd` | `SLUS-12345` | file-prefix | |
+| `ps2` | PlayStation 2 | `.iso`, `.chd` | `SLUS-20675` | folder-exact | |
+| `ps3` | PlayStation 3 | game folder (recursive) or `.sfo` | `BLUS31426` | folder-prefix | experimental |
+| `psvita` | PS Vita | `.zip` (filename only) | `PCSE12345` | folder-exact | |
+| `switch` | Nintendo Switch | `.nsp`, `.xci` | `0100ABCD12345000` | folder-exact | |
+| `3ds` | Nintendo 3DS | `.3ds`, `.cci`, `.z3ds`, `.zcci` | `0004000000123456` | folder-exact | |
+| `wii` | Wii | `.iso`, `.rvz` | `525A5445` (hex of ASCII gameId) | folder-exact | |
+| `wiiu` | Wii U | `.wua` | `10143500` (last 8 of folder name) | folder-exact | |
+| `gamecube` | GameCube | `.iso`, `.rvz` | `475A4C45` (hex of ASCII gameId) | file-prefix | |
+| `xbox360` | Xbox 360 | extracted game folder or `.xex` | `414D07D1` (4-byte XEX title_id, hex) | folder-exact | experimental |
 
 The slugs are stable and match argosy's internal platform identifiers.
 The C API uses the `sigil_platform` enum; `sigil_platform_from_slug()`
@@ -208,6 +214,22 @@ last 8 as `title_id`, the full 16 as `raw_serial`.
 `SIGIL_FLAG_3DS_ALLOW_HOMEBREW` in `opts.flags` to disable the gate
 for CIA/homebrew workflows.
 
+**PSP `.cso` / `.ciso` — experimental.** v1 CSO with raw-deflate
+blocks is decompressed transparently and fed to the standard PSP
+extractor. v2 (LZ4) is not supported. Flagged `experimental=1` on the
+result until validated against a real CSO sample.
+
+**PS3 — experimental, PARAM.SFO scan.** Pass either the
+extracted-game-disc folder (sigil walks up to 4 levels looking for
+`PARAM.SFO`) or the SFO file directly. Reads the `TITLE_ID` string
+(e.g. `BLUS31426`). PKG / encrypted-EBOOT inputs are not supported.
+
+**Xbox 360 — experimental, XEX parse only.** Pass either the
+extracted-game folder (sigil walks looking for `default.xex`) or the
+XEX file directly. The 4-byte XEX execution-info title ID is returned
+as 8-char uppercase hex (e.g. `414D07D1`). Raw GDFX ISO parsing is not
+implemented yet — extract the disc contents first.
+
 ## Building
 
 ```sh
@@ -220,7 +242,8 @@ consumers:
 
 | Flag | Drops |
 |---|---|
-| `-DSIGIL_WITH_CHD=OFF` | libchdr + zlib + lzma + zstd (~200KB) |
+| `-DSIGIL_WITH_CHD=OFF` | libchdr + lzma + zstd (zlib stays if CSO is on) |
+| `-DSIGIL_WITH_CSO=OFF` | zlib-based PSP `.cso` / `.ciso` IO layer |
 | `-DSIGIL_WITH_SWITCH=OFF` | AES-XTS + tiny-AES + Switch NSP/XCI/NCA |
 | `-DSIGIL_WITH_WIIU=OFF` | WUA reader |
 | `-DSIGIL_WITH_3DS=OFF` | 3DS NCSD + zstd-streaming variant |

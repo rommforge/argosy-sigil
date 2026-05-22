@@ -42,7 +42,9 @@ typedef enum {
     SIGIL_PLATFORM_3DS,
     SIGIL_PLATFORM_WII,
     SIGIL_PLATFORM_WIIU,
-    SIGIL_PLATFORM_GAMECUBE
+    SIGIL_PLATFORM_GAMECUBE,
+    SIGIL_PLATFORM_PS3,
+    SIGIL_PLATFORM_XBOX360
 } sigil_platform;
 
 typedef enum {
@@ -68,6 +70,8 @@ typedef struct {
     sigil_platform platform;
     sigil_source   source;
     sigil_usage    usage;
+    /* 1 if the extractor is unverified against real-world samples; 0 otherwise. */
+    int            experimental;
 } sigil_result;
 
 typedef struct sigil_io sigil_io;
@@ -125,6 +129,7 @@ const char *sigil_platform_to_slug(sigil_platform p);
 
 sigil_io *sigil_io_open_file(const char *path);
 sigil_io *sigil_io_open_chd(const char *path);     /* requires SIGIL_WITH_CHD */
+sigil_io *sigil_io_open_cso(const char *path);     /* requires SIGIL_WITH_CSO; .cso/.ciso v1 only */
 sigil_io *sigil_io_open_raw_cd(const char *path);
 void      sigil_io_close(sigil_io *io);
 

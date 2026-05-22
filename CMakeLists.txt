@@ -13,6 +13,7 @@ endif()
 
 # ---- Feature flags -----------------------------------------------------------
 option(SIGIL_WITH_CHD       "Build CHD support (libchdr + zlib/lzma/zstd)" ON)
+option(SIGIL_WITH_CSO       "Build PSP .cso/.ciso v1 IO (zlib raw deflate)" ON)
 option(SIGIL_WITH_SWITCH    "Build Switch NSP/XCI/NCA + AES-XTS"           ON)
 option(SIGIL_WITH_WIIU      "Build Wii U WUA reader"                       ON)
 option(SIGIL_WITH_3DS       "Build 3DS NCSD + .z3ds/.zcci zstd"            ON)
@@ -20,6 +21,11 @@ option(SIGIL_WITH_FILENAME  "Build filename fallback scanners"             ON)
 option(SIGIL_BUILD_CLI      "Build sigil(1) CLI"                           ON)
 option(SIGIL_BUILD_TESTS    "Build tests"                                  ON)
 option(SIGIL_BUILD_SHARED   "Build libsigil as a shared library"           OFF)
+
+set(SIGIL_NEEDS_ZLIB OFF)
+if(SIGIL_WITH_CHD OR SIGIL_WITH_CSO)
+    set(SIGIL_NEEDS_ZLIB ON)
+endif()
 
 # zstd is shared between libchdr's needs (CHD codecs) and sigil's own
 # decompression for Wii U WUA + 3DS .z3ds/.zcci.
@@ -39,8 +45,8 @@ if(SIGIL_NEEDS_ZSTD)
     target_include_directories(sigil_zstd PUBLIC ${ZSTD_DIR} ${ZSTD_DIR}/common)
 endif()
 
-if(SIGIL_WITH_CHD)
-    # zlib (core only)
+if(SIGIL_NEEDS_ZLIB)
+    # zlib (core only) -- shared between libchdr's CHD codecs and io_cso's raw deflate.
     set(ZLIB_DIR ${LIBCHDR_DIR}/deps/zlib-1.3.1)
     add_library(sigil_zlib STATIC
         ${ZLIB_DIR}/adler32.c
@@ -55,7 +61,9 @@ if(SIGIL_WITH_CHD)
         ${ZLIB_DIR}/uncompr.c
         ${ZLIB_DIR}/zutil.c)
     target_include_directories(sigil_zlib PUBLIC ${ZLIB_DIR})
+endif()
 
+if(SIGIL_WITH_CHD)
     # lzma
     set(LZMA_DIR ${LIBCHDR_DIR}/deps/lzma-24.05)
     add_library(sigil_lzma STATIC
@@ -95,16 +103,22 @@ set(SIGIL_SOURCES
     src/sigil.c
     src/iso9660.c
     src/cnf_parser.c
+    src/sfo_parser.c
     src/io_file.c
     src/psp.c
     src/psx.c
     src/ps2.c
+    src/ps3.c
     src/psvita.c
     src/wii.c
+    src/xbox360.c
 )
 
 if(SIGIL_WITH_CHD)
     list(APPEND SIGIL_SOURCES src/io_chd.c src/io_raw_cd.c)
+endif()
+if(SIGIL_WITH_CSO)
+    list(APPEND SIGIL_SOURCES src/io_cso.c)
 endif()
 if(SIGIL_WITH_SWITCH)
     list(APPEND SIGIL_SOURCES
@@ -134,6 +148,10 @@ target_include_directories(sigil PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 if(SIGIL_WITH_CHD)
     target_compile_definitions(sigil PRIVATE SIGIL_WITH_CHD=1)
     target_link_libraries(sigil PRIVATE sigil_chdr)
+endif()
+if(SIGIL_WITH_CSO)
+    target_compile_definitions(sigil PRIVATE SIGIL_WITH_CSO=1)
+    target_link_libraries(sigil PRIVATE sigil_zlib)
 endif()
 if(SIGIL_WITH_SWITCH)
     target_compile_definitions(sigil PRIVATE SIGIL_WITH_SWITCH=1)

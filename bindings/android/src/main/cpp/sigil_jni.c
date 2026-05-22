@@ -11,9 +11,9 @@ static void load_result_class(JNIEnv *env) {
     jclass cls = (*env)->FindClass(env, "com/nendo/sigil/SigilResult");
     if (!cls) return;
     g_result_class = (jclass)(*env)->NewGlobalRef(env, cls);
-    /* SigilResult(titleId, rawSerial, saveId, platformSlug, source, usage) */
+    /* SigilResult(titleId, rawSerial, saveId, platformSlug, source, usage, experimental) */
     g_result_ctor = (*env)->GetMethodID(env, g_result_class, "<init>",
-        "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;II)V");
+        "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IIZ)V");
 }
 
 JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
@@ -81,5 +81,6 @@ Java_com_nendo_sigil_Sigil_nativeExtract(JNIEnv *env, jclass clazz,
 
     return (*env)->NewObject(env, g_result_class, g_result_ctor,
                              jtitle, jraw, jsave_id, jslug,
-                             (jint)r.source, (jint)r.usage);
+                             (jint)r.source, (jint)r.usage,
+                             r.experimental ? JNI_TRUE : JNI_FALSE);
 }

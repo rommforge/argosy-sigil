@@ -66,12 +66,20 @@ int sigil_cnf_parse_boot(const uint8_t *cnf, size_t len,
                          const char *boot_key,
                          char raw[32], char canonical[32]);
 
+int sigil_sfo_get_string(const uint8_t *data, size_t len,
+                         const char *key,
+                         char *out, size_t out_cap);
+
 int sigil_extract_psp(const sigil_io *io, const char *filename_hint,
                       const sigil_options *opts, sigil_result *out);
 int sigil_extract_psx(const sigil_io *io, const char *filename_hint,
                       const sigil_options *opts, sigil_result *out);
 int sigil_extract_ps2(const sigil_io *io, const char *filename_hint,
                       const sigil_options *opts, sigil_result *out);
+int sigil_extract_ps3(const sigil_io *io, const char *filename_hint,
+                      const sigil_options *opts, sigil_result *out);
+int sigil_extract_xbox360(const sigil_io *io, const char *filename_hint,
+                          const sigil_options *opts, sigil_result *out);
 int sigil_extract_wii(const sigil_io *io, const char *filename_hint,
                       const sigil_options *opts, sigil_result *out);
 int sigil_extract_gamecube(const sigil_io *io, const char *filename_hint,

@@ -1,8 +1,12 @@
 // SPDX-License-Identifier: MPL-2.0
 #include "sigil_internal.h"
 #include <stdlib.h>
+#include <stdio.h>
+#include <sys/stat.h>
+#include <dirent.h>
 
 #define SIGIL_VERSION_STRING "0.1.0-dev"
+#define SIGIL_DIR_SCAN_MAX_DEPTH 4
 
 typedef struct {
     sigil_platform p;
@@ -20,6 +24,8 @@ static const platform_slug PLATFORM_SLUGS[] = {
     { SIGIL_PLATFORM_WII,      "wii"      },
     { SIGIL_PLATFORM_WIIU,     "wiiu"     },
     { SIGIL_PLATFORM_GAMECUBE, "gamecube" },
+    { SIGIL_PLATFORM_PS3,      "ps3"      },
+    { SIGIL_PLATFORM_XBOX360,  "xbox360"  },
 };
 static const size_t PLATFORM_SLUG_COUNT = sizeof(PLATFORM_SLUGS) / sizeof(PLATFORM_SLUGS[0]);
 
@@ -30,6 +36,7 @@ static const platform_slug PLATFORM_ALIASES[] = {
     { SIGIL_PLATFORM_GAMECUBE, "gc"   },
     { SIGIL_PLATFORM_3DS,      "n3ds" },
     { SIGIL_PLATFORM_SWITCH,   "nsw"  },
+    { SIGIL_PLATFORM_XBOX360,  "x360" },
 };
 static const size_t PLATFORM_ALIAS_COUNT = sizeof(PLATFORM_ALIASES) / sizeof(PLATFORM_ALIASES[0]);
 
@@ -91,6 +98,10 @@ static sigil_platform sniff_from_extension(const char *filename) {
     if (strcmp(ext, "z3ds") == 0)  return SIGIL_PLATFORM_3DS;
     if (strcmp(ext, "zcci") == 0)  return SIGIL_PLATFORM_3DS;
     if (strcmp(ext, "rvz") == 0)   return SIGIL_PLATFORM_WII;
+    if (strcmp(ext, "cso") == 0)   return SIGIL_PLATFORM_PSP;
+    if (strcmp(ext, "ciso") == 0)  return SIGIL_PLATFORM_PSP;
+    if (strcmp(ext, "sfo") == 0)   return SIGIL_PLATFORM_PS3;
+    if (strcmp(ext, "xex") == 0)   return SIGIL_PLATFORM_XBOX360;
 
     /* `.iso`/`.bin`/`.chd` are ambiguous between PSP/PSX/PS2/Wii/GC; refuse
      * to guess without a hint. */
@@ -113,11 +124,64 @@ static sigil_io *open_io_for_platform(const char *path, sigil_platform p) {
 #else
     (void)can_chd;
 #endif
+#if SIGIL_WITH_CSO
+    if (p == SIGIL_PLATFORM_PSP && (strcmp(ext, "cso") == 0 || strcmp(ext, "ciso") == 0)) {
+        sigil_io *io = sigil_io_open_cso(path);
+        if (io) return io;
+    }
+#endif
     if (p == SIGIL_PLATFORM_PSX && strcmp(ext, "bin") == 0) {
         sigil_io *io = sigil_io_open_raw_cd(path);
         if (io) return io;
     }
     return sigil_io_open_file(path);
+}
+
+static bool path_is_directory(const char *path) {
+    struct stat st;
+    if (stat(path, &st) != 0) return false;
+    return S_ISDIR(st.st_mode);
+}
+
+static int find_file_in_dir(const char *dir, const char *target_name,
+                            char *out, size_t out_cap, int depth) {
+    if (depth > SIGIL_DIR_SCAN_MAX_DEPTH) return SIGIL_ERR_NOT_FOUND;
+    DIR *dp = opendir(dir);
+    if (!dp) return SIGIL_ERR_IO;
+    struct dirent *e;
+    int found = SIGIL_ERR_NOT_FOUND;
+    while ((e = readdir(dp)) != NULL) {
+        const char *name = e->d_name;
+        if (name[0] == '.' && (name[1] == '\0' || (name[1] == '.' && name[2] == '\0'))) continue;
+        char child[1024];
+        int n = snprintf(child, sizeof(child), "%s/%s", dir, name);
+        if (n <= 0 || (size_t)n >= sizeof(child)) continue;
+        struct stat st;
+        if (stat(child, &st) != 0) continue;
+        if (S_ISREG(st.st_mode) && strcasecmp(name, target_name) == 0) {
+            size_t need = (size_t)n + 1;
+            if (need > out_cap) continue;
+            memcpy(out, child, need);
+            found = SIGIL_OK;
+            break;
+        }
+        if (S_ISDIR(st.st_mode)) {
+            if (find_file_in_dir(child, target_name, out, out_cap, depth + 1) == SIGIL_OK) {
+                found = SIGIL_OK;
+                break;
+            }
+        }
+    }
+    closedir(dp);
+    return found;
+}
+
+static const char *directory_target_for_platform(sigil_platform p) {
+    switch (p) {
+    case SIGIL_PLATFORM_PS3:     return "PARAM.SFO";
+    case SIGIL_PLATFORM_XBOX360: return "default.xex";
+    default:                      return NULL;
+    }
 }
 
 static int dispatch(const sigil_io *io, const char *filename_hint,
@@ -133,6 +197,8 @@ static int dispatch(const sigil_io *io, const char *filename_hint,
     case SIGIL_PLATFORM_SWITCH:   return sigil_extract_switch(io, filename_hint, opts, out);
     case SIGIL_PLATFORM_WIIU:     return sigil_extract_wiiu(io, filename_hint, opts, out);
     case SIGIL_PLATFORM_PSVITA:   return sigil_extract_psvita(io, filename_hint, opts, out);
+    case SIGIL_PLATFORM_PS3:      return sigil_extract_ps3(io, filename_hint, opts, out);
+    case SIGIL_PLATFORM_XBOX360:  return sigil_extract_xbox360(io, filename_hint, opts, out);
     default:                       return SIGIL_ERR_UNKNOWN_PLATFORM;
     }
 }
@@ -169,6 +235,15 @@ int sigil_extract_from_io(const sigil_io *io,
             memcpy(out->save_id, out->title_id, len + 1);
         }
     }
+
+    /* Flag CSO-sourced PSP extractions as experimental until verified against real ROMs. */
+    if (rc == SIGIL_OK && filename_hint) {
+        char ext[16];
+        sigil_lower_ext(filename_hint, ext);
+        if (strcmp(ext, "cso") == 0 || strcmp(ext, "ciso") == 0) {
+            out->experimental = 1;
+        }
+    }
     return rc;
 }
 
@@ -192,10 +267,20 @@ int sigil_extract_from_path(const char *path, sigil_platform hint,
         return SIGIL_ERR_UNKNOWN_PLATFORM;
     }
 
-    sigil_io *io = open_io_for_platform(path, resolved);
+    char resolved_path[1024];
+    const char *effective_path = path;
+    const char *dir_target = directory_target_for_platform(resolved);
+    if (dir_target && path_is_directory(path)) {
+        if (find_file_in_dir(path, dir_target, resolved_path, sizeof(resolved_path), 0) != SIGIL_OK) {
+            return SIGIL_ERR_NOT_FOUND;
+        }
+        effective_path = resolved_path;
+    }
+
+    sigil_io *io = open_io_for_platform(effective_path, resolved);
     if (!io) return SIGIL_ERR_IO;
 
-    int rc = sigil_extract_from_io(io, path_basename(path), resolved, opts, out);
+    int rc = sigil_extract_from_io(io, path_basename(effective_path), resolved, opts, out);
     sigil_io_close(io);
     return rc;
 }
