@@ -63,6 +63,8 @@ typedef struct {
     uint32_t       struct_version;
     char           title_id[32];
     char           raw_serial[32];
+    /* Literal on-disk save folder/file name (e.g. PS2 BASLUS-217311). Empty when unknown. */
+    char           save_id[32];
     sigil_platform platform;
     sigil_source   source;
     sigil_usage    usage;

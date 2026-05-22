@@ -158,7 +158,15 @@ int sigil_extract_from_io(const sigil_io *io,
         sigil_result fb;
         if (sigil_filename_fallback(filename_hint, hint, &fb) == SIGIL_OK) {
             *out = fb;
-            return SIGIL_OK;
+            rc = SIGIL_OK;
+        }
+    }
+
+    /* Default save_id to title_id when no platform-specific value was set. */
+    if (rc == SIGIL_OK && out->save_id[0] == '\0') {
+        size_t len = strlen(out->title_id);
+        if (len < sizeof(out->save_id)) {
+            memcpy(out->save_id, out->title_id, len + 1);
         }
     }
     return rc;

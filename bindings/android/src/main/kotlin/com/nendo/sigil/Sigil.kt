@@ -5,6 +5,7 @@ package com.nendo.sigil
 data class SigilResult(
     val titleId: String,
     val rawSerial: String,
+    val saveId: String,
     val platformSlug: String,
     private val sourceCode: Int,
     private val usageCode: Int

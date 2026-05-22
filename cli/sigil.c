@@ -78,9 +78,9 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    printf("platform=%s title_id=%s raw_serial=%s usage=%s source=%s\n",
+    printf("platform=%s title_id=%s raw_serial=%s save_id=%s usage=%s source=%s\n",
            sigil_platform_to_slug(r.platform),
-           r.title_id, r.raw_serial,
+           r.title_id, r.raw_serial, r.save_id,
            usage_to_str(r.usage), source_to_str(r.source));
     return 0;
 }

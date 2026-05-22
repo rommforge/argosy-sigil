@@ -1,6 +1,21 @@
 // SPDX-License-Identifier: MPL-2.0
 #include "integration_helpers.h"
 
+/* Expected save_id shape: BA<4 region letters>[-]?<5 digits>[A-Z0-9]? */
+static int save_id_matches_title(const char *save_id, const char *title_id) {
+    if (strncmp(save_id, "BA", 2) != 0) return 0;
+    if (strncmp(save_id + 2, title_id, 4) != 0) return 0;
+    const char *p = save_id + 6;
+    if (*p == '-') p++;
+    for (int i = 0; i < 5; i++) {
+        if (p[i] != title_id[5 + i]) return 0;
+    }
+    p += 5;
+    if (*p == '\0') return 1;
+    if (((*p >= '0' && *p <= '9') || (*p >= 'A' && *p <= 'Z')) && *(p + 1) == '\0') return 1;
+    return 0;
+}
+
 static int check(const char *path, const char *name) {
     sigil_result r;
     int rc = sigil_extract_from_path(path, SIGIL_PLATFORM_PS2, NULL, &r);
@@ -17,7 +32,13 @@ static int check(const char *path, const char *name) {
         fprintf(stderr, "  FAIL %s: source=filename\n", name);
         return -1;
     }
-    fprintf(stdout, "  ok  %s -> %s (raw=%s)\n", name, r.title_id, r.raw_serial);
+    if (!save_id_matches_title(r.save_id, r.title_id)) {
+        fprintf(stderr, "  FAIL %s: save_id=%s does not match title_id=%s\n",
+                name, r.save_id, r.title_id);
+        return -1;
+    }
+    fprintf(stdout, "  ok  %s -> %s (raw=%s, save_id=%s)\n",
+            name, r.title_id, r.raw_serial, r.save_id);
     return 0;
 }
 

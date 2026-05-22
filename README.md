@@ -11,16 +11,29 @@ not by guessing from filenames.
 You hand sigil a path to a ROM. Sigil reads the platform-native
 identifier directly from the disc/cart binary and hands back:
 
-- `title_id` — the canonical save-matching form the platform's save
-  system expects (`ULUS10064`, `SLUS-12345`, `0100ABCD12345000`, etc.)
+- `title_id` — the canonical identity of the game (`ULUS10064`,
+  `SLUS-12345`, `0100ABCD12345000`). Use this for matching game
+  records, deduplication, RomM/IGDB lookups, UI display.
+- `save_id` — **the literal on-disk save folder/file name the emulator
+  will create.** Use this for any filesystem operation against the
+  save directory. For most platforms it equals `title_id`. For PS2 it
+  diverges (`title_id=SLUS-21731`, `save_id=BASLUS-217311`) because
+  the game's runtime picks a `BA`-prefixed folder name with a per-game
+  variant byte that is not derivable from the disc serial alone —
+  sigil reads it directly from the BOOT2 ELF.
 - `raw_serial` — the ID exactly as it appears in the binary, before
-  any normalization (`ULUS-10064`, `SLUS_123.45`, `RZTE`)
-- `usage` — how the platform uses `title_id` to lay out save artifacts
+  any normalization (`ULUS-10064`, `SLUS_123.45`, `RZTE`). Mostly
+  useful for logging.
+- `usage` — how the platform uses `save_id` to lay out save artifacts
   on disk (one folder per game, multiple folders sharing a prefix,
-  one file, multiple files sharing a prefix)
+  one file, multiple files sharing a prefix).
 - `source` — `binary` if the ID came from the file content
   (high-confidence, lockable) or `filename` if it had to fall back to
-  scanning the filename for a community-naming bracket pattern
+  scanning the filename for a community-naming bracket pattern.
+
+Persist `save_id` alongside `title_id` on your game record once you
+extract it — `title_id` doesn't change, and re-reading the disc to
+recompute `save_id` on every save sync is wasteful.
 
 ## What it isn't
 
@@ -68,14 +81,14 @@ The slugs are stable and match argosy's internal platform identifiers.
 The C API uses the `sigil_platform` enum; `sigil_platform_from_slug()`
 converts strings if your binding accepts user input.
 
-## `usage` — what to do with the title ID
+## `usage` — what to do with `save_id`
 
 | Value | Meaning | Example |
 |---|---|---|
-| `folder-exact` | One folder per game named exactly `title_id` | `Switch/saves/0100ABCD12345000/` |
-| `folder-prefix` | Multiple folders per game, all starting with `title_id` and a profile/slot suffix. Consumers MUST enumerate and bundle all matches. | PSP: `ULUS10064DATA00`, `ULUS10064SETTINGS`, `ULUS10064SAVE01` |
-| `file-exact` | One file per game named with `title_id` | rare; emulator-specific |
-| `file-prefix` | Multiple files per game, all containing `title_id` in the basename | GameCube GCI: `<maker>-<gameId>-<name>.gci` (e.g. `01-GZLE-Animal Crossing.gci`) |
+| `folder-exact` | One folder per game named exactly `save_id` | `Switch/saves/0100ABCD12345000/`, `PS2/memcards/Mc0/BASLUS-217311/` |
+| `folder-prefix` | Multiple folders per game, all starting with `save_id` and a profile/slot suffix. Consumers MUST enumerate and bundle all matches. | PSP: `ULUS10064DATA00`, `ULUS10064SETTINGS`, `ULUS10064SAVE01` |
+| `file-exact` | One file per game named with `save_id` | rare; emulator-specific |
+| `file-prefix` | Multiple files per game, all containing `save_id` in the basename | GameCube GCI: `<maker>-<gameId>-<name>.gci` (e.g. `01-GZLE-Animal Crossing.gci`) |
 
 Treating a `prefix` platform as `exact` silently misses every save for
 that platform — sigil emits this classification so dispatch is correct
@@ -96,7 +109,8 @@ int main(void) {
         return 1;
     }
     printf("platform=%s\n",   sigil_platform_to_slug(r.platform));
-    printf("title_id=%s\n",   r.title_id);     /* what to use for save lookup */
+    printf("title_id=%s\n",   r.title_id);     /* game identity, persist this */
+    printf("save_id=%s\n",    r.save_id);      /* on-disk save folder/file name */
     printf("raw_serial=%s\n", r.raw_serial);   /* as it appears in the binary */
     printf("source=%s\n",     r.source == SIGIL_SOURCE_BINARY ? "binary" : "filename");
     /* r.usage: SIGIL_USAGE_FOLDER_EXACT | _FOLDER_PREFIX | _FILE_EXACT | _FILE_PREFIX */
@@ -111,10 +125,10 @@ spot-checks during integration without writing any code:
 
 ```sh
 $ sigil /path/to/game.xci --platform=switch --prod-keys=/path/to/prod.keys
-platform=switch title_id=0100ABCD12345000 raw_serial=0100ABCD12345000 usage=folder-exact source=binary
+platform=switch title_id=0100ABCD12345000 raw_serial=0100ABCD12345000 save_id=0100ABCD12345000 usage=folder-exact source=binary
 
-$ sigil "/path/to/Persona 2 - Eternal Punishment (USA).chd"
-platform=psx title_id=SLUS-01158 raw_serial=SLUS_011.58 usage=file-prefix source=binary
+$ sigil "/path/to/Silent Hill Origins (USA).chd" --platform=ps2
+platform=ps2 title_id=SLUS-21731 raw_serial=SLUS_217.31 save_id=BASLUS-217311 usage=folder-exact source=binary
 ```
 
 Pass `--platform=auto` (the default) to sniff from the file extension.
@@ -167,11 +181,15 @@ hex-encoded ASCII gameId (`475A4C45` for `GZLE`); consumers match
 files whose basename contains `-<gameId>-`. argosy's `GciSaveHandler`
 is a reference implementation.
 
-**PS2 — `BA` save-side prefix.** Sigil emits the ROM serial
-(`SLUS-20675`). Real PS2 save folders on AetherSX2/NetherSX2/PCSX2
-are named `BASLUS-20675` or `BASLUS20675` — literal `BA` prefix,
-with-or-without the internal dash. Consumers prepend `BA` and match
-both dash variants.
+**PS2 — `BA` prefix + per-game variant byte.** `title_id` is the ROM
+serial (`SLUS-20675`). `save_id` is the literal save folder name the
+game's runtime creates on AetherSX2/NetherSX2/PCSX2 — typically
+`BASLUS-20675`, but some games append a variant byte (`0-9` / `A-Z`)
+to distinguish save profiles, e.g. Silent Hill Origins =
+`BASLUS-217311`, Ace Combat 04 = `BASLUS-20152A`. The variant byte is
+not derivable from the disc serial; sigil reads it from a literal
+string in the BOOT2 ELF. Always prefer `save_id` over reconstructing
+a `BA`-prefixed name from `title_id`.
 
 **Wii / GameCube — title ID is hex of ASCII.** The disc header
 carries a 4-character ASCII gameId (`RZTE`, `GZLE`). The save form

@@ -11,9 +11,9 @@ static void load_result_class(JNIEnv *env) {
     jclass cls = (*env)->FindClass(env, "com/nendo/sigil/SigilResult");
     if (!cls) return;
     g_result_class = (jclass)(*env)->NewGlobalRef(env, cls);
-    /* SigilResult(titleId, rawSerial, platformSlug, source, usage) */
+    /* SigilResult(titleId, rawSerial, saveId, platformSlug, source, usage) */
     g_result_ctor = (*env)->GetMethodID(env, g_result_class, "<init>",
-        "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;II)V");
+        "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;II)V");
 }
 
 JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
@@ -74,10 +74,12 @@ Java_com_nendo_sigil_Sigil_nativeExtract(JNIEnv *env, jclass clazz,
     load_result_class(env);
     if (!g_result_class || !g_result_ctor) return NULL;
 
-    jstring jtitle = (*env)->NewStringUTF(env, r.title_id);
-    jstring jraw   = (*env)->NewStringUTF(env, r.raw_serial);
-    jstring jslug  = (*env)->NewStringUTF(env, sigil_platform_to_slug(r.platform));
+    jstring jtitle   = (*env)->NewStringUTF(env, r.title_id);
+    jstring jraw     = (*env)->NewStringUTF(env, r.raw_serial);
+    jstring jsave_id = (*env)->NewStringUTF(env, r.save_id);
+    jstring jslug    = (*env)->NewStringUTF(env, sigil_platform_to_slug(r.platform));
 
     return (*env)->NewObject(env, g_result_class, g_result_ctor,
-                             jtitle, jraw, jslug, (jint)r.source, (jint)r.usage);
+                             jtitle, jraw, jsave_id, jslug,
+                             (jint)r.source, (jint)r.usage);
 }
