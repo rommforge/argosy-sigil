@@ -16,7 +16,7 @@ static bool ps2_alphanumeric(uint8_t c) {
 static bool ps2_match_core(const uint8_t *p, size_t avail,
                            const char *region, const char *digits) {
     if (avail < PS2_SAVE_CORE_LEN) return false;
-    if (p[0] != 'B' || p[1] != 'A') return false;
+    if (p[0] != 'B' || p[1] < 'A' || p[1] > 'Z') return false;
     for (int i = 0; i < PS2_REGION_LEN; i++) {
         if (p[PS2_SAVE_PREFIX_LEN + i] != (uint8_t)region[i]) return false;
     }
@@ -94,13 +94,21 @@ static int ps2_scan_elf_for_save_id(const sigil_io *io,
     return SIGIL_ERR_NOT_FOUND;
 }
 
+static const char *ps2_region_prefix(const char title_id[32]) {
+    switch (title_id[2]) {
+    case 'E': return "BE";
+    case 'P': case 'J': case 'K': return "BI";
+    default:  return PS2_SAVE_PREFIX;
+    }
+}
+
 static void ps2_default_save_id(const char title_id[32], char out_save_id[32]) {
     size_t len = strlen(title_id);
     if (len + PS2_SAVE_PREFIX_LEN >= 32) {
         out_save_id[0] = '\0';
         return;
     }
-    memcpy(out_save_id, PS2_SAVE_PREFIX, PS2_SAVE_PREFIX_LEN);
+    memcpy(out_save_id, ps2_region_prefix(title_id), PS2_SAVE_PREFIX_LEN);
     memcpy(out_save_id + PS2_SAVE_PREFIX_LEN, title_id, len);
     out_save_id[PS2_SAVE_PREFIX_LEN + len] = '\0';
 }
