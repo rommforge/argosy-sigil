@@ -1,0 +1,86 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  build:
+    name: ${{ matrix.slug }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            slug: linux-x86_64
+          - os: ubuntu-24.04-arm
+            slug: linux-arm64
+          - os: macos-latest
+            slug: macos-arm64
+          - os: windows-latest
+            slug: windows-x86_64
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build static library and CLI
+        run: |
+          cmake -B build-static -S . -DCMAKE_BUILD_TYPE=Release -DSIGIL_BUILD_TESTS=OFF
+          cmake --build build-static --config Release
+
+      - name: Build shared library
+        run: |
+          cmake -B build-shared -S . -DCMAKE_BUILD_TYPE=Release -DSIGIL_BUILD_SHARED=ON -DSIGIL_BUILD_CLI=OFF -DSIGIL_BUILD_TESTS=OFF
+          cmake --build build-shared --config Release
+
+      - name: Stage and package (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          stage="sigil-${GITHUB_REF_NAME}-${{ matrix.slug }}"
+          mkdir -p "$stage/include" "$stage/static" "$stage/shared"
+          cp build-static/sigil "$stage/"
+          cp build-static/libsigil.a "$stage/static/"
+          cp build-shared/libsigil.* "$stage/shared/"
+          cp include/sigil.h "$stage/include/"
+          cp LICENSE README.md "$stage/"
+          tar czf "$stage.tar.gz" "$stage"
+
+      - name: Stage and package (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          stage="sigil-${GITHUB_REF_NAME}-${{ matrix.slug }}"
+          mkdir -p "$stage/include" "$stage/static" "$stage/shared"
+          cp build-static/Release/sigil.exe "$stage/"
+          cp build-static/Release/sigil.lib "$stage/static/"
+          cp build-shared/Release/sigil.dll build-shared/Release/sigil.lib "$stage/shared/"
+          cp include/sigil.h "$stage/include/"
+          cp LICENSE README.md "$stage/"
+          7z a "$stage.zip" "$stage"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sigil-${{ github.ref_name }}-${{ matrix.slug }}
+          path: |
+            sigil-*.tar.gz
+            sigil-*.zip
+          if-no-files-found: error
+
+  release:
+    name: Draft GitHub release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: dist/*

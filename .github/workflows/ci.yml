@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Configure (static)
+        run: cmake -B build -S . -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build (static)
+        run: cmake --build build --config Release
+
+      - name: Test
+        run: ctest --test-dir build -C Release --output-on-failure
+
+      - name: Configure (shared)
+        run: cmake -B build-shared -S . -DCMAKE_BUILD_TYPE=Release -DSIGIL_BUILD_SHARED=ON -DSIGIL_BUILD_TESTS=OFF
+
+      - name: Build (shared)
+        run: cmake --build build-shared --config Release
+
+      - name: CLI smoke check
+        if: runner.os != 'Windows'
+        run: ./build-shared/sigil --help
+
+      - name: CLI smoke check (Windows)
+        if: runner.os == 'Windows'
+        run: build-shared\Release\sigil.exe --help
