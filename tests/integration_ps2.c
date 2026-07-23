@@ -1,19 +1,11 @@
 // SPDX-License-Identifier: MPL-2.0
 #include "integration_helpers.h"
 
-/* Expected save_id shape: BA<4 region letters>[-]?<5 digits>[A-Z0-9]? */
+/* save_id is the folder-prefix stem: B<region letter> + full title_id, no
+ * per-artifact suffix. */
 static int save_id_matches_title(const char *save_id, const char *title_id) {
-    if (strncmp(save_id, "BA", 2) != 0) return 0;
-    if (strncmp(save_id + 2, title_id, 4) != 0) return 0;
-    const char *p = save_id + 6;
-    if (*p == '-') p++;
-    for (int i = 0; i < 5; i++) {
-        if (p[i] != title_id[5 + i]) return 0;
-    }
-    p += 5;
-    if (*p == '\0') return 1;
-    if (((*p >= '0' && *p <= '9') || (*p >= 'A' && *p <= 'Z')) && *(p + 1) == '\0') return 1;
-    return 0;
+    if (save_id[0] != 'B' || save_id[1] < 'A' || save_id[1] > 'Z') return 0;
+    return strcmp(save_id + 2, title_id) == 0;
 }
 
 static int check(const char *path, const char *name) {

@@ -17,10 +17,11 @@ identifier directly from the disc/cart binary and hands back:
 - `save_id` — **the literal on-disk save folder/file name the emulator
   will create.** Use this for any filesystem operation against the
   save directory. For most platforms it equals `title_id`. For PS2 it
-  diverges (`title_id=SLUS-21731`, `save_id=BASLUS-217311`) because
-  the game's runtime picks a `BA`-prefixed folder name with a per-game
-  variant byte that is not derivable from the disc serial alone —
-  sigil reads it directly from the BOOT2 ELF.
+  diverges (`title_id=SLUS-20152`, `save_id=BASLUS-20152`) because the
+  game's runtime prefixes the serial with a region letter
+  (`BA`/`BE`/`BI`) and appends a per-artifact suffix (`AC04`, `SYS`).
+  save_id is the region-prefixed stem and `usage` is `folder-prefix`,
+  so consumers enumerate every folder starting with it.
 - `raw_serial` — the ID exactly as it appears in the binary, before
   any normalization (`ULUS-10064`, `SLUS_123.45`, `RZTE`). Mostly
   useful for logging.
@@ -73,7 +74,7 @@ to sigil's own files must remain MPL-2.0.
 |---|---|---|---|---|---|
 | `psp` | PSP | `.iso`, `.chd`, `.cso` / `.ciso` | `ULUS10064` | folder-prefix | `.cso` experimental |
 | `psx` | PlayStation | `.iso`, `.bin`, `.chd` | `SLUS-12345` | file-prefix | |
-| `ps2` | PlayStation 2 | `.iso`, `.chd` | `SLUS-20675` | folder-exact | |
+| `ps2` | PlayStation 2 | `.iso`, `.chd` | `SLUS-20675` | folder-prefix | |
 | `ps3` | PlayStation 3 | game folder (recursive) or `.sfo` | `BLUS31426` | folder-prefix | experimental |
 | `psvita` | PS Vita | `.zip` (filename only) | `PCSE12345` | folder-exact | |
 | `switch` | Nintendo Switch | `.nsp`, `.xci` | `0100ABCD12345000` | folder-exact | |
@@ -91,8 +92,8 @@ converts strings if your binding accepts user input.
 
 | Value | Meaning | Example |
 |---|---|---|
-| `folder-exact` | One folder per game named exactly `save_id` | `Switch/saves/0100ABCD12345000/`, `PS2/memcards/Mc0/BASLUS-217311/` |
-| `folder-prefix` | Multiple folders per game, all starting with `save_id` and a profile/slot suffix. Consumers MUST enumerate and bundle all matches. | PSP: `ULUS10064DATA00`, `ULUS10064SETTINGS`, `ULUS10064SAVE01` |
+| `folder-exact` | One folder per game named exactly `save_id` | `Switch/saves/0100ABCD12345000/` |
+| `folder-prefix` | Multiple folders per game, all starting with `save_id` and a profile/slot suffix. Consumers MUST enumerate and bundle all matches. | PSP: `ULUS10064DATA00`, `ULUS10064SETTINGS`; PS2: `BASLUS-20642SYS`, `BASLUS-20642RD0` |
 | `file-exact` | One file per game named with `save_id` | rare; emulator-specific |
 | `file-prefix` | Multiple files per game, all containing `save_id` in the basename | GameCube GCI: `<maker>-<gameId>-<name>.gci` (e.g. `01-GZLE-Animal Crossing.gci`) |
 
@@ -133,8 +134,8 @@ spot-checks during integration without writing any code:
 $ sigil /path/to/game.xci --platform=switch --prod-keys=/path/to/prod.keys
 platform=switch title_id=0100ABCD12345000 raw_serial=0100ABCD12345000 save_id=0100ABCD12345000 usage=folder-exact source=binary
 
-$ sigil "/path/to/Silent Hill Origins (USA).chd" --platform=ps2
-platform=ps2 title_id=SLUS-21731 raw_serial=SLUS_217.31 save_id=BASLUS-217311 usage=folder-exact source=binary
+$ sigil "/path/to/Ace Combat 04 (USA).chd" --platform=ps2
+platform=ps2 title_id=SLUS-20152 raw_serial=SLUS_201.52 save_id=BASLUS-20152 usage=folder-prefix source=binary
 ```
 
 Pass `--platform=auto` (the default) to sniff from the file extension.
@@ -187,15 +188,16 @@ hex-encoded ASCII gameId (`475A4C45` for `GZLE`); consumers match
 files whose basename contains `-<gameId>-`. argosy's `GciSaveHandler`
 is a reference implementation.
 
-**PS2 — `BA` prefix + per-game variant byte.** `title_id` is the ROM
-serial (`SLUS-20675`). `save_id` is the literal save folder name the
-game's runtime creates on AetherSX2/NetherSX2/PCSX2 — typically
-`BASLUS-20675`, but some games append a variant byte (`0-9` / `A-Z`)
-to distinguish save profiles, e.g. Silent Hill Origins =
-`BASLUS-217311`, Ace Combat 04 = `BASLUS-20152A`. The variant byte is
-not derivable from the disc serial; sigil reads it from a literal
-string in the BOOT2 ELF. Always prefer `save_id` over reconstructing
-a `BA`-prefixed name from `title_id`.
+**PS2 — region prefix + folder-prefix enumeration.** `title_id` is the
+ROM serial (`SLUS-20152`). `save_id` is the region-prefixed stem
+(`BASLUS-20152`): `BA` for NTSC-U (`SLUS`), `BE` for PAL (`SLES`), `BI`
+for `SLPS`/`SLPM`/`SLKA`, derived from the serial's region letter. The
+folders the game creates on AetherSX2/NetherSX2/PCSX2 append a
+per-artifact suffix (Ace Combat 04 = `BASLUS-20152AC04`; Champions of
+Norrath splits into `BASLUS-20642SYS` + `BASLUS-20642RD0`), so `usage`
+is `folder-prefix` and consumers enumerate every memory-card folder
+whose name starts with `save_id`. The suffix is not derivable from the
+disc, and it does not need to be: prefix matching captures it.
 
 **Wii / GameCube — title ID is hex of ASCII.** The disc header
 carries a 4-character ASCII gameId (`RZTE`, `GZLE`). The save form
