@@ -5,6 +5,25 @@
 #include <stddef.h>
 #include <stdint.h>
 
+/* SIGIL_EXPORTS is defined when building the shared library itself;
+ * consumers of the DLL define SIGIL_SHARED (CMake propagates it). Static
+ * builds need neither and the macro is empty. */
+#ifndef SIGIL_API
+#if defined(_WIN32)
+#if defined(SIGIL_EXPORTS)
+#define SIGIL_API __declspec(dllexport)
+#elif defined(SIGIL_SHARED)
+#define SIGIL_API __declspec(dllimport)
+#else
+#define SIGIL_API
+#endif
+#elif defined(SIGIL_EXPORTS)
+#define SIGIL_API __attribute__((visibility("default")))
+#else
+#define SIGIL_API
+#endif
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -109,34 +128,34 @@ typedef struct {
 /* Extract from a path. `hint=SIGIL_PLATFORM_AUTO` sniffs from the file
  * extension. `opts=NULL` uses defaults (filename fallback ON, no support
  * context, retail-only 3DS). */
-int sigil_extract_from_path(const char *path,
-                            sigil_platform hint,
-                            const sigil_options *opts,
-                            sigil_result *out);
+SIGIL_API int sigil_extract_from_path(const char *path,
+                                      sigil_platform hint,
+                                      const sigil_options *opts,
+                                      sigil_result *out);
 
 /* Extract through a caller-supplied I/O abstraction. `filename_hint` is
  * used for extension sniffing and the filename fallback path; may be NULL. */
-int sigil_extract_from_io(const sigil_io *io,
-                          const char *filename_hint,
-                          sigil_platform hint,
-                          const sigil_options *opts,
-                          sigil_result *out);
+SIGIL_API int sigil_extract_from_io(const sigil_io *io,
+                                    const char *filename_hint,
+                                    sigil_platform hint,
+                                    const sigil_options *opts,
+                                    sigil_result *out);
 
 /* Returns SIGIL_PLATFORM_AUTO for unknown / NULL slugs. */
-sigil_platform sigil_platform_from_slug(const char *slug);
+SIGIL_API sigil_platform sigil_platform_from_slug(const char *slug);
 /* Returns "auto" for invalid values. Pointer is to a static string. */
-const char *sigil_platform_to_slug(sigil_platform p);
+SIGIL_API const char *sigil_platform_to_slug(sigil_platform p);
 
-sigil_io *sigil_io_open_file(const char *path);
-sigil_io *sigil_io_open_chd(const char *path);     /* requires SIGIL_WITH_CHD */
-sigil_io *sigil_io_open_cso(const char *path);     /* requires SIGIL_WITH_CSO; .cso/.ciso v1 only */
-sigil_io *sigil_io_open_raw_cd(const char *path);
-void      sigil_io_close(sigil_io *io);
+SIGIL_API sigil_io *sigil_io_open_file(const char *path);
+SIGIL_API sigil_io *sigil_io_open_chd(const char *path);     /* requires SIGIL_WITH_CHD */
+SIGIL_API sigil_io *sigil_io_open_cso(const char *path);     /* requires SIGIL_WITH_CSO; .cso/.ciso v1 only */
+SIGIL_API sigil_io *sigil_io_open_raw_cd(const char *path);
+SIGIL_API void      sigil_io_close(sigil_io *io);
 
-int sigil_load_header_key_from_prod_keys(const char *path, uint8_t out[32]);
+SIGIL_API int sigil_load_header_key_from_prod_keys(const char *path, uint8_t out[32]);
 
-const char *sigil_strerror(int code);
-const char *sigil_version(void);
+SIGIL_API const char *sigil_strerror(int code);
+SIGIL_API const char *sigil_version(void);
 
 #ifdef __cplusplus
 }

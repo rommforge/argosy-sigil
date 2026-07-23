@@ -1,9 +1,14 @@
 // SPDX-License-Identifier: MPL-2.0
 #include "sigil_internal.h"
+#include "sigil_compat.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <sys/stat.h>
+#ifdef _WIN32
+#include <windows.h>
+#else
 #include <dirent.h>
+#endif
 
 #define SIGIL_VERSION_STRING "0.1.0-dev"
 #define SIGIL_DIR_SCAN_MAX_DEPTH 4
@@ -143,6 +148,40 @@ static bool path_is_directory(const char *path) {
     return S_ISDIR(st.st_mode);
 }
 
+#ifdef _WIN32
+static int find_file_in_dir(const char *dir, const char *target_name,
+                            char *out, size_t out_cap, int depth) {
+    if (depth > SIGIL_DIR_SCAN_MAX_DEPTH) return SIGIL_ERR_NOT_FOUND;
+    char pattern[1024];
+    int pn = snprintf(pattern, sizeof(pattern), "%s\\*", dir);
+    if (pn <= 0 || (size_t)pn >= sizeof(pattern)) return SIGIL_ERR_IO;
+    WIN32_FIND_DATAA fd;
+    HANDLE h = FindFirstFileA(pattern, &fd);
+    if (h == INVALID_HANDLE_VALUE) return SIGIL_ERR_IO;
+    int found = SIGIL_ERR_NOT_FOUND;
+    do {
+        const char *name = fd.cFileName;
+        if (name[0] == '.' && (name[1] == '\0' || (name[1] == '.' && name[2] == '\0'))) continue;
+        char child[1024];
+        int n = snprintf(child, sizeof(child), "%s\\%s", dir, name);
+        if (n <= 0 || (size_t)n >= sizeof(child)) continue;
+        if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) {
+            if (find_file_in_dir(child, target_name, out, out_cap, depth + 1) == SIGIL_OK) {
+                found = SIGIL_OK;
+                break;
+            }
+        } else if (strcasecmp(name, target_name) == 0) {
+            size_t need = (size_t)n + 1;
+            if (need > out_cap) continue;
+            memcpy(out, child, need);
+            found = SIGIL_OK;
+            break;
+        }
+    } while (FindNextFileA(h, &fd));
+    FindClose(h);
+    return found;
+}
+#else
 static int find_file_in_dir(const char *dir, const char *target_name,
                             char *out, size_t out_cap, int depth) {
     if (depth > SIGIL_DIR_SCAN_MAX_DEPTH) return SIGIL_ERR_NOT_FOUND;
@@ -175,6 +214,7 @@ static int find_file_in_dir(const char *dir, const char *target_name,
     closedir(dp);
     return found;
 }
+#endif
 
 static const char *directory_target_for_platform(sigil_platform p) {
     switch (p) {

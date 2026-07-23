@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MPL-2.0
 #include "sigil_internal.h"
+#include "sigil_compat.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

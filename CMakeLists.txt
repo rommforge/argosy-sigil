@@ -140,10 +140,25 @@ endif()
 
 if(SIGIL_BUILD_SHARED)
     add_library(sigil SHARED ${SIGIL_SOURCES})
+    # SIGIL_EXPORTS marks the build of the library itself (dllexport /
+    # default visibility); SIGIL_SHARED tells consumers to dllimport.
+    target_compile_definitions(sigil
+        PRIVATE SIGIL_EXPORTS
+        INTERFACE SIGIL_SHARED)
+    set_target_properties(sigil PROPERTIES VERSION 0.1.0 SOVERSION 0)
 else()
     add_library(sigil STATIC ${SIGIL_SOURCES})
 endif()
 target_include_directories(sigil PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+
+# glibc hides off_t/fseeko/dirent behind feature-test macros under strict C99;
+# Darwin and MSVC expose them unconditionally, so scope this to Linux.
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    target_compile_definitions(sigil PRIVATE
+        _POSIX_C_SOURCE=200809L
+        _DEFAULT_SOURCE
+        _FILE_OFFSET_BITS=64)
+endif()
 
 if(SIGIL_WITH_CHD)
     target_compile_definitions(sigil PRIVATE SIGIL_WITH_CHD=1)
