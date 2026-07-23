@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+.pytest_cache/
+sigil/_sigil.c
+sigil/_sigil.o
+sigil/_sigil.*.so
+sigil/_sigil.*.pyd
