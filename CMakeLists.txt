@@ -11,6 +11,12 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
+# glibc gates fseeko/ftello/off_t under strict C99; implicit declarations
+# truncate 64-bit offsets (CHD reads past 2 GiB fail). Must cover libchdr too.
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    add_compile_definitions(_POSIX_C_SOURCE=200809L _DEFAULT_SOURCE _FILE_OFFSET_BITS=64)
+endif()
+
 # ---- Feature flags -----------------------------------------------------------
 option(SIGIL_WITH_CHD       "Build CHD support (libchdr + zlib/lzma/zstd)" ON)
 option(SIGIL_WITH_CSO       "Build PSP .cso/.ciso v1 IO (zlib raw deflate)" ON)
@@ -150,15 +156,6 @@ else()
     add_library(sigil STATIC ${SIGIL_SOURCES})
 endif()
 target_include_directories(sigil PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
-
-# glibc hides off_t/fseeko/dirent behind feature-test macros under strict C99;
-# Darwin and MSVC expose them unconditionally, so scope this to Linux.
-if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    target_compile_definitions(sigil PRIVATE
-        _POSIX_C_SOURCE=200809L
-        _DEFAULT_SOURCE
-        _FILE_OFFSET_BITS=64)
-endif()
 
 if(SIGIL_WITH_CHD)
     target_compile_definitions(sigil PRIVATE SIGIL_WITH_CHD=1)
