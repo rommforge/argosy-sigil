@@ -63,6 +63,13 @@ void sigil_aes_xts_encrypt_nintendo(const uint8_t key[32],
 int sigil_decode_header_key_from_text(const char *text, size_t text_len,
                                        uint8_t out[32]);
 
+/* Load a named 16-byte key (e.g. "key_area_key_application_00") from a
+ * prod.keys file or an in-memory prod.keys blob. */
+int sigil_load_key16_from_prod_keys(const char *path, const char *key_name,
+                                    uint8_t out[16]);
+int sigil_decode_key16_from_text(const char *text, size_t text_len,
+                                 const char *key_name, uint8_t out[16]);
+
 int sigil_resolve_header_key(const sigil_support *sup, uint8_t out[32]);
 
 int sigil_nca_extract_title_id(const uint8_t *decrypted_header, char out_title_id[17]);
@@ -72,6 +79,56 @@ int sigil_nca_extract_title_id(const uint8_t *decrypted_header, char out_title_i
 int sigil_nca_title_from_raw_header(const uint8_t *raw_header,
                                     const uint8_t *header_key_or_null,
                                     char out_title_id[17]);
+
+/* Plaintext-first decrypt of a raw NCA header into `out` (0xC00 bytes).
+ * SIGIL_OK when a valid NCA2/NCA3 magic is present after resolving crypto,
+ * SIGIL_ERR_NEEDS_KEY when encrypted and no key given, else NOT_FOUND. */
+int sigil_nca_decrypt_header(const uint8_t *raw_header,
+                             const uint8_t *header_key_or_null,
+                             uint8_t out[SIGIL_NCA_HEADER_SIZE]);
+
+/* AES-128-CTR (symmetric: en/decrypt). `ctr` is the initial 16-byte counter
+ * and is consumed in place. Length need not be block-aligned. */
+void sigil_aes_ctr_crypt(const uint8_t key[16], uint8_t ctr[16],
+                         uint8_t *buf, size_t len);
+
+/* Title facts a Switch container walk resolves. `content_type` and `version`
+ * are populated only from CNMT; `from_cnmt` marks the authoritative path. */
+typedef struct {
+    char     title_id[17];
+    int      content_type;   /* enum sigil_switch_content_type */
+    uint32_t version;
+    bool     from_cnmt;
+} sigil_switch_title;
+
+/* Given a decrypted Meta NCA header plus the raw container IO and the key
+ * material, decrypt the section, locate the .cnmt and read the authoritative
+ * per-content title id / version / content type. */
+int sigil_cnmt_from_meta_nca(const sigil_io *io, uint64_t nca_offset,
+                             const uint8_t decrypted_header[SIGIL_NCA_HEADER_SIZE],
+                             const sigil_support *sup,
+                             sigil_switch_title *out);
+
+/* Shared PFS0 header field parse. `hdr` is the 16-byte PFS0 header; fills the
+ * entry-table / string-table / data offsets relative to the PFS0 start. */
+typedef struct {
+    uint32_t file_count;
+    uint32_t string_table_size;
+    uint64_t entries_off;
+    uint64_t string_table_off;
+    uint64_t data_off;
+} sigil_pfs0_layout;
+
+int sigil_pfs0_parse_header(const uint8_t hdr[16], sigil_pfs0_layout *out);
+
+/* Walk a PFS0 partition and resolve title facts, preferring CNMT when a key
+ * and prod.keys source are present, else falling back to program_id. */
+int sigil_pfs0_extract_title(const sigil_io *io, uint64_t partition_off,
+                             const uint8_t *header_key_or_null,
+                             const sigil_support *sup_or_null,
+                             sigil_switch_title *out);
+
+void sigil_apply_switch_title(sigil_result *out, const sigil_switch_title *t);
 #endif
 
 int sigil_cnf_parse_boot(const uint8_t *cnf, size_t len,
@@ -120,7 +177,7 @@ static inline int sigil_filename_fallback(const char *filename_hint,
 
 static inline void sigil_result_init(sigil_result *r) {
     memset(r, 0, sizeof(*r));
-    r->struct_version = SIGIL_RESULT_V1;
+    r->struct_version = SIGIL_RESULT_V2;
 }
 
 #endif

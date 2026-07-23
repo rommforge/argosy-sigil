@@ -18,6 +18,15 @@ static const char *source_to_str(sigil_source s) {
     return s == SIGIL_SOURCE_BINARY ? "binary" : "filename";
 }
 
+static const char *content_type_to_str(int t) {
+    switch (t) {
+    case SIGIL_SWITCH_CONTENT_APPLICATION: return "application";
+    case SIGIL_SWITCH_CONTENT_PATCH:       return "patch";
+    case SIGIL_SWITCH_CONTENT_ADDON:       return "addon";
+    default:                                return "unknown";
+    }
+}
+
 static void print_usage(void) {
     fprintf(stderr,
         "sigil %s — extract platform-native title IDs from ROM files\n"
@@ -78,9 +87,10 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    printf("platform=%s title_id=%s raw_serial=%s save_id=%s usage=%s source=%s experimental=%d\n",
+    printf("platform=%s title_id=%s raw_serial=%s save_id=%s usage=%s source=%s experimental=%d content_type=%s title_version=%u\n",
            sigil_platform_to_slug(r.platform),
            r.title_id, r.raw_serial, r.save_id,
-           usage_to_str(r.usage), source_to_str(r.source), r.experimental);
+           usage_to_str(r.usage), source_to_str(r.source), r.experimental,
+           content_type_to_str(r.switch_content_type), r.title_version);
     return 0;
 }

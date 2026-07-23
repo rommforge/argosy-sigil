@@ -101,7 +101,7 @@ if(SIGIL_WITH_SWITCH)
     set(TINY_AES_DIR ${CMAKE_CURRENT_SOURCE_DIR}/third_party/tiny-AES-c)
     add_library(sigil_aes STATIC ${TINY_AES_DIR}/aes.c)
     target_include_directories(sigil_aes PUBLIC ${TINY_AES_DIR})
-    target_compile_definitions(sigil_aes PUBLIC AES128=1 CBC=0 CTR=0 ECB=1)
+    target_compile_definitions(sigil_aes PUBLIC AES128=1 CBC=0 CTR=1 ECB=1)
 endif()
 
 # ---- libsigil ----------------------------------------------------------------
@@ -132,7 +132,8 @@ if(SIGIL_WITH_SWITCH)
         src/switch_keys.c
         src/switch_nsp.c
         src/switch_xci.c
-        src/switch_nca.c)
+        src/switch_nca.c
+        src/switch_cnmt.c)
 endif()
 if(SIGIL_WITH_WIIU)
     list(APPEND SIGIL_SOURCES src/wiiu_wua.c)

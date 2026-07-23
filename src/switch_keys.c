@@ -22,6 +22,17 @@ static int decode_hex32(const char *hex, size_t len, uint8_t out[32]) {
     return SIGIL_OK;
 }
 
+static int decode_hex16(const char *hex, size_t len, uint8_t out[16]) {
+    if (len != 32) return SIGIL_ERR_INVALID_ARG;
+    for (int i = 0; i < 16; i++) {
+        int hi = hex_nibble(hex[i * 2]);
+        int lo = hex_nibble(hex[i * 2 + 1]);
+        if (hi < 0 || lo < 0) return SIGIL_ERR_INVALID_ARG;
+        out[i] = (uint8_t)((hi << 4) | lo);
+    }
+    return SIGIL_OK;
+}
+
 static bool is_ws(char c) { return c == ' ' || c == '\t'; }
 
 static int find_key_hex(const char *text, size_t text_len, const char *key_name,
@@ -90,4 +101,35 @@ int sigil_decode_header_key_from_text(const char *text, size_t text_len,
     int rc = find_key_hex(text, text_len, "header_key", &hex, &hex_len);
     if (rc != SIGIL_OK) return rc;
     return decode_hex32(hex, hex_len, out);
+}
+
+int sigil_decode_key16_from_text(const char *text, size_t text_len,
+                                 const char *key_name, uint8_t out[16]) {
+    if (!text || !key_name || !out) return SIGIL_ERR_INVALID_ARG;
+    const char *hex; size_t hex_len;
+    int rc = find_key_hex(text, text_len, key_name, &hex, &hex_len);
+    if (rc != SIGIL_OK) return rc;
+    return decode_hex16(hex, hex_len, out);
+}
+
+int sigil_load_key16_from_prod_keys(const char *path, const char *key_name,
+                                    uint8_t out[16]) {
+    if (!path || !key_name || !out) return SIGIL_ERR_INVALID_ARG;
+
+    FILE *fp = fopen(path, "rb");
+    if (!fp) return SIGIL_ERR_IO;
+    if (fseeko(fp, 0, SEEK_END) != 0) { fclose(fp); return SIGIL_ERR_IO; }
+    off_t sz = ftello(fp);
+    if (sz < 0 || sz > 1024 * 1024) { fclose(fp); return SIGIL_ERR_IO; }
+    rewind(fp);
+
+    char *buf = (char *)malloc((size_t)sz + 1);
+    if (!buf) { fclose(fp); return SIGIL_ERR_OOM; }
+    size_t got = fread(buf, 1, (size_t)sz, fp);
+    fclose(fp);
+    buf[got] = '\0';
+
+    int rc = sigil_decode_key16_from_text(buf, got, key_name, out);
+    free(buf);
+    return rc;
 }

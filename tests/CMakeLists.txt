@@ -28,3 +28,10 @@ sigil_add_test(integration_3ds)
 sigil_add_test(unit_sfo)
 sigil_add_test(unit_xex)
 sigil_add_test(unit_switch_nca)
+
+# The CNMT fixture builds encrypted NCA sections, so it needs tiny-AES's ECB
+# helpers directly (in addition to sigil's exported CTR/XTS wrappers).
+if(SIGIL_WITH_SWITCH)
+    sigil_add_test(unit_switch_cnmt)
+    target_link_libraries(unit_switch_cnmt PRIVATE sigil_aes)
+endif()

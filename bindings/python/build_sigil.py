@@ -19,6 +19,7 @@ ffibuilder = FFI()
 ffibuilder.cdef(
     """
 #define SIGIL_RESULT_V1 ...
+#define SIGIL_RESULT_V2 ...
 #define SIGIL_SUPPORT_V1 ...
 #define SIGIL_OPTIONS_V1 ...
 
@@ -65,6 +66,14 @@ typedef enum {
     ...
 } sigil_usage;
 
+enum sigil_switch_content_type {
+    SIGIL_SWITCH_CONTENT_UNKNOWN,
+    SIGIL_SWITCH_CONTENT_APPLICATION,
+    SIGIL_SWITCH_CONTENT_PATCH,
+    SIGIL_SWITCH_CONTENT_ADDON,
+    ...
+};
+
 typedef struct {
     uint32_t       struct_version;
     char           title_id[32];
@@ -74,6 +83,8 @@ typedef struct {
     sigil_source   source;
     sigil_usage    usage;
     int            experimental;
+    int            switch_content_type;
+    uint32_t       title_version;
 } sigil_result;
 
 typedef struct {

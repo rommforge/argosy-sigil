@@ -94,6 +94,13 @@ _USAGE_NAMES = {
     lib.SIGIL_USAGE_FILE_PREFIX: "file-prefix",
 }
 
+_SWITCH_CONTENT_NAMES: dict[int, Literal["unknown", "application", "patch", "addon"]] = {
+    lib.SIGIL_SWITCH_CONTENT_UNKNOWN: "unknown",
+    lib.SIGIL_SWITCH_CONTENT_APPLICATION: "application",
+    lib.SIGIL_SWITCH_CONTENT_PATCH: "patch",
+    lib.SIGIL_SWITCH_CONTENT_ADDON: "addon",
+}
+
 
 @dataclass(frozen=True)
 class SigilResult:
@@ -106,6 +113,8 @@ class SigilResult:
     source: Literal["binary", "filename"]
     usage: str
     experimental: bool
+    switch_content_type: Literal["unknown", "application", "patch", "addon"]
+    title_version: int
 
 
 def _raise_error(code: int) -> None:
@@ -193,7 +202,7 @@ def extract(
         opts.support = support
 
     result = ffi.new("sigil_result *")
-    result.struct_version = lib.SIGIL_RESULT_V1
+    result.struct_version = lib.SIGIL_RESULT_V2
 
     rc = lib.sigil_extract_from_path(
         os.fsencode(path), platform_from_slug(platform), opts, result
@@ -209,4 +218,6 @@ def extract(
         source=_SOURCE_NAMES.get(result.source, "binary"),
         usage=_USAGE_NAMES.get(result.usage, "folder-exact"),
         experimental=bool(result.experimental),
+        switch_content_type=_SWITCH_CONTENT_NAMES.get(result.switch_content_type, "unknown"),
+        title_version=int(result.title_version),
     )

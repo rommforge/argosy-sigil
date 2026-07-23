@@ -71,4 +71,20 @@ int sigil_nca_title_from_raw_header(const uint8_t *raw_header,
     return sigil_nca_extract_title_id(header, out_title_id);
 }
 
+static bool nca_has_magic(const uint8_t *header) {
+    return memcmp(header + NCA_MAGIC_OFFSET, "NCA3", 4) == 0 ||
+           memcmp(header + NCA_MAGIC_OFFSET, "NCA2", 4) == 0;
+}
+
+int sigil_nca_decrypt_header(const uint8_t *raw_header,
+                             const uint8_t *header_key_or_null,
+                             uint8_t out[SIGIL_NCA_HEADER_SIZE]) {
+    memcpy(out, raw_header, SIGIL_NCA_HEADER_SIZE);
+    if (nca_has_magic(out)) return SIGIL_OK; /* plaintext dump */
+    if (!header_key_or_null) return SIGIL_ERR_NEEDS_KEY;
+    sigil_aes_xts_decrypt_nintendo(header_key_or_null, 0, out,
+                                   SIGIL_NCA_HEADER_SIZE);
+    return nca_has_magic(out) ? SIGIL_OK : SIGIL_ERR_NOT_FOUND;
+}
+
 #endif

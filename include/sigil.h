@@ -29,6 +29,7 @@ extern "C" {
 #endif
 
 #define SIGIL_RESULT_V1   1u
+#define SIGIL_RESULT_V2   2u
 #define SIGIL_SUPPORT_V1  1u
 #define SIGIL_OPTIONS_V1  1u
 
@@ -80,6 +81,15 @@ typedef enum {
     SIGIL_USAGE_FILE_PREFIX = 3
 } sigil_usage;
 
+/* Switch CNMT content-meta type. Set only for Switch when the content-meta
+ * NCA was parsed; UNKNOWN for all other platforms and keyless fallbacks. */
+enum sigil_switch_content_type {
+    SIGIL_SWITCH_CONTENT_UNKNOWN = 0,
+    SIGIL_SWITCH_CONTENT_APPLICATION,
+    SIGIL_SWITCH_CONTENT_PATCH,
+    SIGIL_SWITCH_CONTENT_ADDON
+};
+
 typedef struct {
     uint32_t       struct_version;
     char           title_id[32];
@@ -91,6 +101,11 @@ typedef struct {
     sigil_usage    usage;
     /* 1 if the extractor is unverified against real-world samples; 0 otherwise. */
     int            experimental;
+    /* Switch only, from CNMT (struct_version >= SIGIL_RESULT_V2). Values from
+     * enum sigil_switch_content_type; 0/UNKNOWN when no CNMT was parsed. */
+    int            switch_content_type;
+    /* Switch only, per-content version from CNMT; 0 when unavailable. */
+    uint32_t       title_version;
 } sigil_result;
 
 typedef struct sigil_io sigil_io;
