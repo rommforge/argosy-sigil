@@ -78,4 +78,36 @@ void sigil_aes_xts_decrypt_nintendo(const uint8_t key[32],
     }
 }
 
+void sigil_aes_xts_encrypt_nintendo(const uint8_t key[32],
+                                     uint64_t start_sector,
+                                     uint8_t *data, size_t len) {
+    struct AES_ctx data_ctx;
+    struct AES_ctx tweak_ctx;
+    AES_init_ctx(&data_ctx,  key);
+    AES_init_ctx(&tweak_ctx, key + 16);
+
+    const size_t SECTOR = 0x200;
+    size_t sectors = (len + SECTOR - 1) / SECTOR;
+
+    for (size_t s = 0; s < sectors; s++) {
+        uint8_t tweak[16] = {0};
+        uint64_t n = start_sector + s;
+        for (int i = 15; i >= 8; i--) {
+            tweak[i] = (uint8_t)(n & 0xFF);
+            n >>= 8;
+        }
+        AES_ECB_encrypt(&tweak_ctx, tweak);
+
+        uint8_t *sector_base = data + s * SECTOR;
+        size_t sector_len = (s * SECTOR + SECTOR <= len) ? SECTOR : len - s * SECTOR;
+        for (size_t off = 0; off + 16 <= sector_len; off += 16) {
+            uint8_t *block = sector_base + off;
+            for (int i = 0; i < 16; i++) block[i] ^= tweak[i];
+            AES_ECB_encrypt(&data_ctx, block);
+            for (int i = 0; i < 16; i++) block[i] ^= tweak[i];
+            mul_alpha(tweak);
+        }
+    }
+}
+
 #endif

@@ -25,7 +25,8 @@ int sigil_resolve_header_key(const sigil_support *sup, uint8_t out[32]) {
 }
 
 int sigil_nca_extract_title_id(const uint8_t *decrypted_header, char out_title_id[17]) {
-    if (memcmp(decrypted_header + NCA_MAGIC_OFFSET, "NCA3", 4) != 0) {
+    if (memcmp(decrypted_header + NCA_MAGIC_OFFSET, "NCA3", 4) != 0 &&
+        memcmp(decrypted_header + NCA_MAGIC_OFFSET, "NCA2", 4) != 0) {
         return SIGIL_ERR_NOT_FOUND;
     }
 
@@ -50,6 +51,24 @@ int sigil_nca_extract_title_id(const uint8_t *decrypted_header, char out_title_i
     }
 
     return SIGIL_ERR_NOT_FOUND;
+}
+
+/* Plaintext-first: decrypted dumps already carry a valid NCA magic, and
+ * XTS-decrypting a plaintext header would scramble it. Only decrypt (a
+ * copy, the caller's buffer stays raw) when the plaintext probe fails. */
+int sigil_nca_title_from_raw_header(const uint8_t *raw_header,
+                                    const uint8_t *header_key_or_null,
+                                    char out_title_id[17]) {
+    if (sigil_nca_extract_title_id(raw_header, out_title_id) == SIGIL_OK) {
+        return SIGIL_OK;
+    }
+    if (!header_key_or_null) return SIGIL_ERR_NEEDS_KEY;
+
+    uint8_t header[SIGIL_NCA_HEADER_SIZE];
+    memcpy(header, raw_header, SIGIL_NCA_HEADER_SIZE);
+    sigil_aes_xts_decrypt_nintendo(header_key_or_null, 0, header,
+                                   SIGIL_NCA_HEADER_SIZE);
+    return sigil_nca_extract_title_id(header, out_title_id);
 }
 
 #endif

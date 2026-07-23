@@ -54,12 +54,24 @@ void sigil_aes_xts_decrypt_nintendo(const uint8_t key[32],
                                      uint64_t start_sector,
                                      uint8_t *data, size_t len);
 
+/* Inverse of the above. Not used by extraction; exists so tests can build
+ * encrypted NCA fixtures deterministically. */
+void sigil_aes_xts_encrypt_nintendo(const uint8_t key[32],
+                                     uint64_t start_sector,
+                                     uint8_t *data, size_t len);
+
 int sigil_decode_header_key_from_text(const char *text, size_t text_len,
                                        uint8_t out[32]);
 
 int sigil_resolve_header_key(const sigil_support *sup, uint8_t out[32]);
 
 int sigil_nca_extract_title_id(const uint8_t *decrypted_header, char out_title_id[17]);
+
+/* Tries the header as plaintext first, then decrypts a copy if a key is
+ * present. SIGIL_ERR_NEEDS_KEY when plaintext fails and no key is given. */
+int sigil_nca_title_from_raw_header(const uint8_t *raw_header,
+                                    const uint8_t *header_key_or_null,
+                                    char out_title_id[17]);
 #endif
 
 int sigil_cnf_parse_boot(const uint8_t *cnf, size_t len,

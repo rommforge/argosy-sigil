@@ -73,12 +73,7 @@ int sigil_pfs0_extract_title_id(const sigil_io *io, uint64_t partition_off,
         return SIGIL_OK;
     }
 
-    if (!header_key_or_null) {
-        free(entries);
-        free(string_table);
-        return SIGIL_ERR_NEEDS_KEY;
-    }
-
+    bool needs_key = false;
     rc = SIGIL_ERR_NOT_FOUND;
     for (uint32_t i = 0; i < file_count; i++) {
         const uint8_t *e = entries + i * 24;
@@ -104,12 +99,15 @@ int sigil_pfs0_extract_title_id(const sigil_io *io, uint64_t partition_off,
         if (sigil_io_read_exact(io, data_start + file_offset, header,
                                  SIGIL_NCA_HEADER_SIZE) != SIGIL_OK) continue;
 
-        sigil_aes_xts_decrypt_nintendo(header_key_or_null, 0, header, SIGIL_NCA_HEADER_SIZE);
-        if (sigil_nca_extract_title_id(header, out_title_id) == SIGIL_OK) {
+        int nrc = sigil_nca_title_from_raw_header(header, header_key_or_null,
+                                                  out_title_id);
+        if (nrc == SIGIL_OK) {
             rc = SIGIL_OK;
             break;
         }
+        if (nrc == SIGIL_ERR_NEEDS_KEY) needs_key = true;
     }
+    if (rc != SIGIL_OK && needs_key) rc = SIGIL_ERR_NEEDS_KEY;
 
     free(entries);
     free(string_table);
