@@ -22,6 +22,16 @@ identifier directly from the disc/cart binary and hands back:
   (`BA`/`BE`/`BI`) and appends a per-artifact suffix (`AC04`, `SYS`).
   save_id is the region-prefixed stem and `usage` is `folder-prefix`,
   so consumers enumerate every folder starting with it.
+- `save_path` — where the save sits **relative to the platform's save
+  root**, `/`-separated, for the platforms whose id is split across
+  directory levels. The 3DS stores `0004000000033500` as
+  `title/00040000/00033500/`, so `save_path=00040000/00033500` and a
+  consumer joins it under its own emulator prefix rather than
+  re-deriving the split. Equals `save_id` everywhere the save is a
+  single directory, so single-segment platforms can ignore it. This is
+  disc-derived only — the emulator-specific part above it (a user
+  directory, `sdmc/Nintendo 3DS`, per-install id folders) is the
+  consumer's to supply, because the same title differs per emulator.
 - `raw_serial` — the ID exactly as it appears in the binary, before
   any normalization (`ULUS-10064`, `SLUS_123.45`, `RZTE`). Mostly
   useful for logging.
@@ -36,8 +46,8 @@ identifier directly from the disc/cart binary and hands back:
   writing). Consumers should surface this to users so a low-confidence
   result can be flagged in UI / logs.
 
-Persist `save_id` alongside `title_id` on your game record once you
-extract it — `title_id` doesn't change, and re-reading the disc to
+Persist `save_id` and `save_path` alongside `title_id` on your game
+record once you extract them — `title_id` doesn't change, and re-reading the disc to
 recompute `save_id` on every save sync is wasteful.
 
 ## What it isn't

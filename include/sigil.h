@@ -30,6 +30,7 @@ extern "C" {
 
 #define SIGIL_RESULT_V1   1u
 #define SIGIL_RESULT_V2   2u
+#define SIGIL_RESULT_V3   3u
 #define SIGIL_SUPPORT_V1  1u
 #define SIGIL_OPTIONS_V1  1u
 
@@ -96,6 +97,11 @@ typedef struct {
     char           raw_serial[32];
     /* Literal on-disk save folder/file name (e.g. PS2 BASLUS-217311). Empty when unknown. */
     char           save_id[32];
+    /* Where the save sits relative to the platform's save root, '/'-separated, when the
+     * id is split across directory levels (3DS 0004000000033500 -> 00040000/00033500).
+     * Defaults to save_id for the single-segment platforms (struct_version >= V3).
+     * Disc-derived only: emulator-specific prefixes are the consumer's business. */
+    char           save_path[64];
     sigil_platform platform;
     sigil_source   source;
     sigil_usage    usage;

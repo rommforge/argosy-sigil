@@ -177,7 +177,7 @@ static inline int sigil_filename_fallback(const char *filename_hint,
 
 static inline void sigil_result_init(sigil_result *r) {
     memset(r, 0, sizeof(*r));
-    r->struct_version = SIGIL_RESULT_V2;
+    r->struct_version = SIGIL_RESULT_V3;
 }
 
 #endif

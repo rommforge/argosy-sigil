@@ -276,6 +276,14 @@ int sigil_extract_from_io(const sigil_io *io,
         }
     }
 
+    /* Default save_path to save_id: platforms whose save is one directory need no split. */
+    if (rc == SIGIL_OK && out->save_path[0] == '\0') {
+        size_t len = strlen(out->save_id);
+        if (len < sizeof(out->save_path)) {
+            memcpy(out->save_path, out->save_id, len + 1);
+        }
+    }
+
     /* Flag CSO-sourced PSP extractions as experimental until verified against real ROMs. */
     if (rc == SIGIL_OK && filename_hint) {
         char ext[16];

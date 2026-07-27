@@ -86,6 +86,16 @@ int sigil_extract_3ds(const sigil_io *io, const char *filename_hint,
 
     memcpy(out->title_id,  tid, 17);
     memcpy(out->raw_serial, tid, 17);
+
+    /* The 16-hex program id is stored as two directory levels on the SD card:
+     * title/<high 8>/<low 8>/data. Emit that split so consumers place a save
+     * without re-deriving it; the sdmc/<id0>/<id1> prefix above it is
+     * emulator configuration and deliberately not ours to describe. */
+    memcpy(out->save_path, tid, 8);
+    out->save_path[8] = '/';
+    memcpy(out->save_path + 9, tid + 8, 8);
+    out->save_path[17] = '\0';
+
     out->source = SIGIL_SOURCE_BINARY;
     return SIGIL_OK;
 }

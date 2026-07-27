@@ -6,6 +6,13 @@ data class SigilResult(
     val titleId: String,
     val rawSerial: String,
     val saveId: String,
+    /**
+     * Where the save sits relative to the platform's save root, '/'-separated, for ids
+     * split across directory levels (3DS `0004000000033500` -> `00040000/00033500`).
+     * Equals [saveId] on single-directory platforms. Disc-derived only: the emulator's
+     * own prefix above it is the consumer's to supply.
+     */
+    val savePath: String,
     val platformSlug: String,
     private val sourceCode: Int,
     private val usageCode: Int,
