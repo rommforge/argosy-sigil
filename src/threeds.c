@@ -57,10 +57,6 @@ int sigil_extract_3ds(const sigil_io *io, const char *filename_hint,
 
     sigil_result_init(out);
     out->platform = SIGIL_PLATFORM_3DS;
-    /* The save id nests as two 32-bit halves (<high 8>/<low 8>), so consumers
-     * must split it rather than treat it as one flat folder. The SD-card root
-     * above it (sdmc/.../title/) is the emulator's prefix, not ours. save_id
-     * defaults to the full title id; usage says how to lay it out. */
     out->usage = SIGIL_USAGE_FOLDER_SPLIT;
 
     char ext[16];
@@ -90,6 +86,15 @@ int sigil_extract_3ds(const sigil_io *io, const char *filename_hint,
 
     memcpy(out->title_id,  tid, 17);
     memcpy(out->raw_serial, tid, 17);
+
+    /* save_id is the on-disk save location, not the flat id: the 3DS nests it
+     * as title/<high 8>/<low 8>/, so emit 00040000/00033500 and the consumer
+     * places it without knowing the split. usage=folder-split marks it as a
+     * '/'-separated path; the sdmc/.../title/ root above is the emulator's. */
+    memcpy(out->save_id, tid, 8);
+    out->save_id[8] = '/';
+    memcpy(out->save_id + 9, tid + 8, 8);
+    out->save_id[17] = '\0';
 
     out->source = SIGIL_SOURCE_BINARY;
     return SIGIL_OK;

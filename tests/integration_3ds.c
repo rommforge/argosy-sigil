@@ -25,7 +25,14 @@ static int check(const char *path, const char *name) {
         fprintf(stderr, "  FAIL %s: usage=%d (want folder-split)\n", name, r.usage);
         return -1;
     }
-    fprintf(stdout, "  ok  %s -> %s\n", name, r.title_id);
+    /* save_id is the on-disk split, not the flat id: <high 8>/<low 8>. */
+    char want_save_id[18];
+    snprintf(want_save_id, sizeof(want_save_id), "%.8s/%.8s", r.title_id, r.title_id + 8);
+    if (strcmp(r.save_id, want_save_id) != 0) {
+        fprintf(stderr, "  FAIL %s: save_id=%s (want %s)\n", name, r.save_id, want_save_id);
+        return -1;
+    }
+    fprintf(stdout, "  ok  %s -> %s\n", name, r.save_id);
     return 0;
 }
 

@@ -27,6 +27,7 @@ sigil_add_test(integration_wiiu)
 sigil_add_test(integration_3ds)
 sigil_add_test(unit_sfo)
 sigil_add_test(unit_xex)
+sigil_add_test(unit_3ds)
 sigil_add_test(unit_switch_nca)
 
 # The CNMT fixture builds encrypted NCA sections, so it needs tiny-AES's ECB

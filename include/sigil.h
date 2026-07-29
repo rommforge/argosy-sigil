@@ -74,8 +74,9 @@ typedef enum {
 
 /* EXACT vs PREFIX is load-bearing — PREFIX platforms have multiple save
  * artifacts per game that consumers must enumerate-and-bundle. SPLIT means
- * save_id nests as equal-length path segments rather than one flat folder
- * (3DS: the 16-hex id becomes two 32-bit halves, 00040000/00033500). */
+ * save_id is already a '/'-separated nested path rather than a flat folder
+ * name (3DS: 00040000/00033500), so the consumer creates the intermediate
+ * directories. */
 typedef enum {
     SIGIL_USAGE_FOLDER_EXACT = 0,
     SIGIL_USAGE_FOLDER_PREFIX = 1,
@@ -98,7 +99,7 @@ typedef struct {
     char           title_id[32];
     char           raw_serial[32];
     /* Literal on-disk save folder/file name (e.g. PS2 BASLUS-217311). Empty when unknown.
-     * With usage FOLDER_SPLIT the consumer nests this as equal-length segments. */
+     * With usage FOLDER_SPLIT it is a '/'-separated relative path (3DS: 00040000/00033500). */
     char           save_id[32];
     sigil_platform platform;
     sigil_source   source;

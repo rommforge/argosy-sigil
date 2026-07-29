@@ -22,9 +22,10 @@ identifier directly from the disc/cart binary and hands back:
   (`BA`/`BE`/`BI`) and appends a per-artifact suffix (`AC04`, `SYS`).
   save_id is the region-prefixed stem and `usage` is `folder-prefix`,
   so consumers enumerate every folder starting with it. For the 3DS,
-  `usage` is `folder-split`: the 16-hex `save_id` splits into two 32-bit
-  halves (`00040000/00033500`), so the consumer nests it rather than
-  treating it as one flat folder. Everything above that split (a user
+  `save_id` is itself a `/`-separated path (`00040000/00033500`, the
+  16-hex title id split into two 32-bit halves) and `usage` is
+  `folder-split` to flag that: the consumer creates the nested folders
+  and never has to know where to split. Everything above it (a user
   directory, `sdmc/Nintendo 3DS`, the `title/` root, per-install id
   folders) is the emulator's prefix and the consumer's to supply,
   because the same title differs per emulator.
@@ -102,7 +103,7 @@ converts strings if your binding accepts user input.
 | `folder-prefix` | Multiple folders per game, all starting with `save_id` and a profile/slot suffix. Consumers MUST enumerate and bundle all matches. | PSP: `ULUS10064DATA00`, `ULUS10064SETTINGS`; PS2: `BASLUS-20642SYS`, `BASLUS-20642RD0` |
 | `file-exact` | One file per game named with `save_id` | rare; emulator-specific |
 | `file-prefix` | Multiple files per game, all containing `save_id` in the basename | GameCube GCI: `<maker>-<gameId>-<name>.gci` (e.g. `01-GZLE-Animal Crossing.gci`) |
-| `folder-split` | One folder per game, but `save_id` nests as equal-length path segments instead of a flat name | 3DS: `0004000000033500` -> `00040000/00033500` |
+| `folder-split` | `save_id` is a `/`-separated nested path, not a flat name; consumer creates the intermediate folders | 3DS: `save_id` = `00040000/00033500` |
 
 Treating a `prefix` platform as `exact` silently misses every save for
 that platform — sigil emits this classification so dispatch is correct
