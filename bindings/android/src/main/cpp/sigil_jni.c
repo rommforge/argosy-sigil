@@ -13,7 +13,7 @@ static void load_result_class(JNIEnv *env) {
     g_result_class = (jclass)(*env)->NewGlobalRef(env, cls);
     /* SigilResult(titleId, rawSerial, saveId, platformSlug, source, usage, experimental) */
     g_result_ctor = (*env)->GetMethodID(env, g_result_class, "<init>",
-        "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IIZ)V");
+        "(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;IIZ)V");
 }
 
 JNIEXPORT void JNICALL JNI_OnUnload(JavaVM *vm, void *reserved) {
