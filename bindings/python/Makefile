@@ -6,7 +6,7 @@ SIGIL_ROOT := $(abspath ../..)
 BUILD_DIR  := $(SIGIL_ROOT)/build-python
 PYTHON     ?= python3
 
-.PHONY: all build test clean
+.PHONY: all build test contract clean
 
 all: build
 
@@ -20,6 +20,10 @@ build: $(BUILD_DIR)/libsigil.a
 
 test: build
 	$(PYTHON) -m pytest test_sigil.py -v
+
+# Cross-language source checks; no compiled extension or Android toolchain.
+contract:
+	$(PYTHON) -m pytest test_contract.py -v
 
 clean:
 	rm -rf $(BUILD_DIR) sigil/_sigil.c sigil/_sigil.o sigil/_sigil.*.so \
