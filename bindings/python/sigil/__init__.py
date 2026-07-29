@@ -92,6 +92,7 @@ _USAGE_NAMES = {
     lib.SIGIL_USAGE_FOLDER_PREFIX: "folder-prefix",
     lib.SIGIL_USAGE_FILE_EXACT: "file-exact",
     lib.SIGIL_USAGE_FILE_PREFIX: "file-prefix",
+    lib.SIGIL_USAGE_FOLDER_SPLIT: "folder-split",
 }
 
 _SWITCH_CONTENT_NAMES: dict[int, Literal["unknown", "application", "patch", "addon"]] = {

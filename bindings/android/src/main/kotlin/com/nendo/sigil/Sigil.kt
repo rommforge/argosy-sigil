@@ -6,13 +6,6 @@ data class SigilResult(
     val titleId: String,
     val rawSerial: String,
     val saveId: String,
-    /**
-     * Where the save sits relative to the platform's save root, '/'-separated, for ids
-     * split across directory levels (3DS `0004000000033500` -> `00040000/00033500`).
-     * Equals [saveId] on single-directory platforms. Disc-derived only: the emulator's
-     * own prefix above it is the consumer's to supply.
-     */
-    val savePath: String,
     val platformSlug: String,
     private val sourceCode: Int,
     private val usageCode: Int,
@@ -29,12 +22,13 @@ data class SigilResult(
         }
     }
 
-    /** EXACT vs PREFIX is load-bearing — see project README. */
+    /** EXACT vs PREFIX is load-bearing; SPLIT nests saveId as path segments. See README. */
     enum class Usage(val code: Int) {
         FolderExact(0),
         FolderPrefix(1),
         FileExact(2),
-        FilePrefix(3);
+        FilePrefix(3),
+        FolderSplit(4);
         companion object {
             fun fromCode(c: Int): Usage = values().firstOrNull { it.code == c } ?: FolderExact
         }

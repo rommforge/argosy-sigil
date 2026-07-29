@@ -63,6 +63,7 @@ typedef enum {
     SIGIL_USAGE_FOLDER_PREFIX,
     SIGIL_USAGE_FILE_EXACT,
     SIGIL_USAGE_FILE_PREFIX,
+    SIGIL_USAGE_FOLDER_SPLIT,
     ...
 } sigil_usage;
 
@@ -79,7 +80,6 @@ typedef struct {
     char           title_id[32];
     char           raw_serial[32];
     char           save_id[32];
-    char           save_path[64];
     sigil_platform platform;
     sigil_source   source;
     sigil_usage    usage;

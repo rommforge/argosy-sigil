@@ -10,6 +10,7 @@ static const char *usage_to_str(sigil_usage u) {
     case SIGIL_USAGE_FOLDER_PREFIX: return "folder-prefix";
     case SIGIL_USAGE_FILE_EXACT:    return "file-exact";
     case SIGIL_USAGE_FILE_PREFIX:   return "file-prefix";
+    case SIGIL_USAGE_FOLDER_SPLIT:  return "folder-split";
     default:                         return "?";
     }
 }
@@ -87,9 +88,9 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    printf("platform=%s title_id=%s raw_serial=%s save_id=%s save_path=%s usage=%s source=%s experimental=%d content_type=%s title_version=%u\n",
+    printf("platform=%s title_id=%s raw_serial=%s save_id=%s usage=%s source=%s experimental=%d content_type=%s title_version=%u\n",
            sigil_platform_to_slug(r.platform),
-           r.title_id, r.raw_serial, r.save_id, r.save_path,
+           r.title_id, r.raw_serial, r.save_id,
            usage_to_str(r.usage), source_to_str(r.source), r.experimental,
            content_type_to_str(r.switch_content_type), r.title_version);
     return 0;

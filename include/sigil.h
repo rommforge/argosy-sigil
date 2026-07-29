@@ -30,7 +30,6 @@ extern "C" {
 
 #define SIGIL_RESULT_V1   1u
 #define SIGIL_RESULT_V2   2u
-#define SIGIL_RESULT_V3   3u
 #define SIGIL_SUPPORT_V1  1u
 #define SIGIL_OPTIONS_V1  1u
 
@@ -74,12 +73,15 @@ typedef enum {
 } sigil_source;
 
 /* EXACT vs PREFIX is load-bearing — PREFIX platforms have multiple save
- * artifacts per game that consumers must enumerate-and-bundle. */
+ * artifacts per game that consumers must enumerate-and-bundle. SPLIT means
+ * save_id nests as equal-length path segments rather than one flat folder
+ * (3DS: the 16-hex id becomes two 32-bit halves, 00040000/00033500). */
 typedef enum {
     SIGIL_USAGE_FOLDER_EXACT = 0,
     SIGIL_USAGE_FOLDER_PREFIX = 1,
     SIGIL_USAGE_FILE_EXACT = 2,
-    SIGIL_USAGE_FILE_PREFIX = 3
+    SIGIL_USAGE_FILE_PREFIX = 3,
+    SIGIL_USAGE_FOLDER_SPLIT = 4
 } sigil_usage;
 
 /* Switch CNMT content-meta type. Set only for Switch when the content-meta
@@ -95,13 +97,9 @@ typedef struct {
     uint32_t       struct_version;
     char           title_id[32];
     char           raw_serial[32];
-    /* Literal on-disk save folder/file name (e.g. PS2 BASLUS-217311). Empty when unknown. */
+    /* Literal on-disk save folder/file name (e.g. PS2 BASLUS-217311). Empty when unknown.
+     * With usage FOLDER_SPLIT the consumer nests this as equal-length segments. */
     char           save_id[32];
-    /* Where the save sits relative to the platform's save root, '/'-separated, when the
-     * id is split across directory levels (3DS 0004000000033500 -> 00040000/00033500).
-     * Defaults to save_id for the single-segment platforms (struct_version >= V3).
-     * Disc-derived only: emulator-specific prefixes are the consumer's business. */
-    char           save_path[64];
     sigil_platform platform;
     sigil_source   source;
     sigil_usage    usage;

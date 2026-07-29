@@ -21,6 +21,10 @@ static int check(const char *path, const char *name) {
         fprintf(stderr, "  FAIL %s: source=filename\n", name);
         return -1;
     }
+    if (r.usage != SIGIL_USAGE_FOLDER_SPLIT) {
+        fprintf(stderr, "  FAIL %s: usage=%d (want folder-split)\n", name, r.usage);
+        return -1;
+    }
     fprintf(stdout, "  ok  %s -> %s\n", name, r.title_id);
     return 0;
 }

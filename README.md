@@ -21,17 +21,13 @@ identifier directly from the disc/cart binary and hands back:
   game's runtime prefixes the serial with a region letter
   (`BA`/`BE`/`BI`) and appends a per-artifact suffix (`AC04`, `SYS`).
   save_id is the region-prefixed stem and `usage` is `folder-prefix`,
-  so consumers enumerate every folder starting with it.
-- `save_path` — where the save sits **relative to the platform's save
-  root**, `/`-separated, for the platforms whose id is split across
-  directory levels. The 3DS stores `0004000000033500` as
-  `title/00040000/00033500/`, so `save_path=00040000/00033500` and a
-  consumer joins it under its own emulator prefix rather than
-  re-deriving the split. Equals `save_id` everywhere the save is a
-  single directory, so single-segment platforms can ignore it. This is
-  disc-derived only — the emulator-specific part above it (a user
-  directory, `sdmc/Nintendo 3DS`, per-install id folders) is the
-  consumer's to supply, because the same title differs per emulator.
+  so consumers enumerate every folder starting with it. For the 3DS,
+  `usage` is `folder-split`: the 16-hex `save_id` splits into two 32-bit
+  halves (`00040000/00033500`), so the consumer nests it rather than
+  treating it as one flat folder. Everything above that split (a user
+  directory, `sdmc/Nintendo 3DS`, the `title/` root, per-install id
+  folders) is the emulator's prefix and the consumer's to supply,
+  because the same title differs per emulator.
 - `raw_serial` — the ID exactly as it appears in the binary, before
   any normalization (`ULUS-10064`, `SLUS_123.45`, `RZTE`). Mostly
   useful for logging.
@@ -46,7 +42,7 @@ identifier directly from the disc/cart binary and hands back:
   writing). Consumers should surface this to users so a low-confidence
   result can be flagged in UI / logs.
 
-Persist `save_id` and `save_path` alongside `title_id` on your game
+Persist `save_id` and `usage` alongside `title_id` on your game
 record once you extract them — `title_id` doesn't change, and re-reading the disc to
 recompute `save_id` on every save sync is wasteful.
 
@@ -88,7 +84,7 @@ to sigil's own files must remain MPL-2.0.
 | `ps3` | PlayStation 3 | game folder (recursive) or `.sfo` | `BLUS31426` | folder-prefix | experimental |
 | `psvita` | PS Vita | `.zip` (filename only) | `PCSE12345` | folder-exact | |
 | `switch` | Nintendo Switch | `.nsp`, `.xci` | `0100ABCD12345000` | folder-exact | |
-| `3ds` | Nintendo 3DS | `.3ds`, `.cci`, `.z3ds`, `.zcci` | `0004000000123456` | folder-exact | |
+| `3ds` | Nintendo 3DS | `.3ds`, `.cci`, `.z3ds`, `.zcci` | `0004000000123456` | folder-split | |
 | `wii` | Wii | `.iso`, `.rvz` | `525A5445` (hex of ASCII gameId) | folder-exact | |
 | `wiiu` | Wii U | `.wua` | `10143500` (last 8 of folder name) | folder-exact | |
 | `gamecube` | GameCube | `.iso`, `.rvz` | `475A4C45` (hex of ASCII gameId) | file-prefix | |
@@ -106,6 +102,7 @@ converts strings if your binding accepts user input.
 | `folder-prefix` | Multiple folders per game, all starting with `save_id` and a profile/slot suffix. Consumers MUST enumerate and bundle all matches. | PSP: `ULUS10064DATA00`, `ULUS10064SETTINGS`; PS2: `BASLUS-20642SYS`, `BASLUS-20642RD0` |
 | `file-exact` | One file per game named with `save_id` | rare; emulator-specific |
 | `file-prefix` | Multiple files per game, all containing `save_id` in the basename | GameCube GCI: `<maker>-<gameId>-<name>.gci` (e.g. `01-GZLE-Animal Crossing.gci`) |
+| `folder-split` | One folder per game, but `save_id` nests as equal-length path segments instead of a flat name | 3DS: `0004000000033500` -> `00040000/00033500` |
 
 Treating a `prefix` platform as `exact` silently misses every save for
 that platform — sigil emits this classification so dispatch is correct
@@ -130,7 +127,7 @@ int main(void) {
     printf("save_id=%s\n",    r.save_id);      /* on-disk save folder/file name */
     printf("raw_serial=%s\n", r.raw_serial);   /* as it appears in the binary */
     printf("source=%s\n",     r.source == SIGIL_SOURCE_BINARY ? "binary" : "filename");
-    /* r.usage: SIGIL_USAGE_FOLDER_EXACT | _FOLDER_PREFIX | _FILE_EXACT | _FILE_PREFIX */
+    /* r.usage: SIGIL_USAGE_FOLDER_EXACT | _FOLDER_PREFIX | _FILE_EXACT | _FILE_PREFIX | _FOLDER_SPLIT */
     return 0;
 }
 ```
