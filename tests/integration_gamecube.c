@@ -27,7 +27,7 @@ int main(void) {
     /* /tmp/roms uses `ngc` for GameCube. */
     char path[512];
     if (build_subdir(rom_dir, "ngc", path) != 0) return 1;
-    const char *exts[] = { "iso", "rvz", NULL };
+    const char *exts[] = { "iso", "rvz", "wbfs", NULL };
     walk_stats st = walk_dir(path, check, exts);
     fprintf(stdout, "GameCube: processed=%d passed=%d failed=%d\n",
             st.processed, st.passed, st.failed);

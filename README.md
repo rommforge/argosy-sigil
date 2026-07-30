@@ -86,9 +86,9 @@ to sigil's own files must remain MPL-2.0.
 | `psvita` | PS Vita | `.zip` (filename only) | `PCSE12345` | folder-exact | |
 | `switch` | Nintendo Switch | `.nsp`, `.xci` | `0100ABCD12345000` | folder-exact | |
 | `3ds` | Nintendo 3DS | `.3ds`, `.cci`, `.z3ds`, `.zcci` | `0004000000123456` | folder-split | |
-| `wii` | Wii | `.iso`, `.rvz` | `525A5445` (hex of ASCII gameId) | folder-exact | |
+| `wii` | Wii | `.iso`, `.rvz`, `.wbfs` | `525A5445` (hex of ASCII gameId) | folder-exact | |
 | `wiiu` | Wii U | `.wua` | `10143500` (last 8 of folder name) | folder-exact | |
-| `gamecube` | GameCube | `.iso`, `.rvz` | `475A4C45` (hex of ASCII gameId) | file-prefix | |
+| `gamecube` | GameCube | `.iso`, `.rvz`, `.wbfs` | `475A4C45` (hex of ASCII gameId) | file-prefix | |
 | `xbox360` | Xbox 360 | extracted game folder or `.xex` | `414D07D1` (4-byte XEX title_id, hex) | folder-exact | experimental |
 
 The slugs are stable and match argosy's internal platform identifiers.
