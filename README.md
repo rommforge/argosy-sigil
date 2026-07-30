@@ -214,6 +214,15 @@ what Dolphin's NAND structure uses. `raw_serial` preserves the ASCII
 form for human-readable logging; use `title_id` for actual save
 lookup.
 
+**Wii `.wbfs` — the disc header moves, it does not disappear.** A WBFS
+file wraps a real disc header behind its own container header; the
+wrapped header starts at the first hd sector, whose size the container
+records as a shift at offset 8. Sigil reads the id there only when a
+console magic backs it (Wii `5D1C9EA3` at +0x18, GameCube `C2339F3D`
+at +0x1C). That check is not decoration: `WBFS` is four uppercase ASCII
+bytes, so without it the container magic itself passes as a game id and
+every wbfs dump collapses to the same bogus `57424653`.
+
 **Wii U — last 8 of 16-hex.** WUA archives carry a top-level folder
 named `00050000<8 hex>_v0`. The full 16 hex is the formal title ID;
 the last 8 chars are what the save system keys on. Sigil emits the
